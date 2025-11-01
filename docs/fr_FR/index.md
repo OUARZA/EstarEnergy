@@ -1,18 +1,36 @@
-# Plugin template
+# Plugin Estar Energy
 
-Ce "template de plugin" sert de base à la réalisation de plugins pour **Jeedom**.
+Le plugin **Estar Energy** permet de collecter les informations disponibles sur le portail Estar Power afin d'alimenter votre domotique Jeedom avec les données de votre installation photovoltaïque.
 
-La documentation générale relative à la conception de plugin est consultable [ici](https://doc.jeedom.com/fr_FR/dev/).
+## Configuration du plugin
 
-Dans le détail :   
-* [Utilisation du template de plugin](https://doc.jeedom.com/fr_FR/dev/plugin_template) : Le template de plugin est une base de plugin pour Jeedom qui doit être adaptée avec l'id de votre plugin et à laquelle il suffit d'ajouter vos propres fonctions.
+1. **Identifiants globaux** : dans la configuration du plugin, indiquez l'identifiant et le mot de passe utilisés sur https://monitor.estarpower.com.
+2. **Création d'un équipement** : dans l'onglet du plugin, ajoutez un nouvel équipement puis saisissez le SID de la centrale à superviser (visible dans l'URL du portail Estar Power).
+3. **Sauvegarde** : enregistrez l'équipement ; toutes les commandes infos sont créées automatiquement.
 
-* [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Intégré depuis la version 3.0 de Jeedom, le fichier **info.json** est obligatoire pour le bon fonctionnement des plugins et leur bon déploiement sur le Market Jeedom.
+Le plugin interroge le portail toutes les 5 minutes. Une cadence plus rapide est déconseillée afin d'éviter les limitations imposées par Estar Power.
 
-* [Icône du plugin](https://doc.jeedom.com/fr_FR/dev/Icone_de_plugin) : Afin de pouvoir être publié sur le Market Jeedom, tout plugin doit disposer d’une icône. Attention à ne pas utiliser le même code couleur que les icônes des plugins Jeedom officiels.
+## Commandes disponibles
 
-* [Widget du plugin](https://doc.jeedom.com/fr_FR/dev/widget_plugin) : Présentation des différentes manières d'inclure des widgets personnalisés au plugin.
+Chaque équipement expose les commandes infos suivantes :
 
-* [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Présentation de la mise en place d'une documentation car un bon plugin n'est rien sans documentation adéquate.
+* `Pv_power` : puissance photovoltaïque instantanée (W)
+* `Load_power` : puissance consommée par le foyer (W)
+* `Grid_power` : puissance prélevée/injectée sur le réseau (W)
+* `meter_b_in_eq` : énergie importée depuis le réseau (Wh)
+* `meter_b_out_eq` : énergie exportée vers le réseau (Wh)
+* `self_eq` : énergie issue de l'autoconsommation (Wh)
+* `today_eq` : production du jour (Wh)
+* `month_eq` : production du mois (Wh)
+* `year_eq` : production de l'année (Wh)
+* `total_eq` : production totale (Wh)
+* `plant_tree` : estimation du nombre d'arbres compensés
+* `co2_emission_reduction` : estimation de la réduction d'émissions de CO₂ (kg)
 
-* [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Description des pré-requis indispensables à la publication du plugin.
+Toutes les commandes sont historisées par défaut pour faciliter le suivi énergétique.
+
+## Dépannage
+
+* Vérifiez que les identifiants Estar Power saisis dans la configuration du plugin sont corrects.
+* Assurez-vous que le SID renseigné correspond bien à la centrale désirée.
+* Consultez les logs du plugin (`estarenergy`) pour obtenir le détail des éventuelles erreurs de connexion ou de récupération de données.

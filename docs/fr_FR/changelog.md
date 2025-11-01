@@ -1,30 +1,12 @@
-# Changelog plugin template
+# Changelog Estar Energy
 
->**IMPORTANT**
+> **IMPORTANT**
 >
->S'il n'y a pas d'information sur la mise à jour, c'est que celle-ci concerne uniquement de la mise à jour de documentation, de traduction ou de texte.
+> S'il n'y a pas d'information sur une mise à jour, cela signifie qu'elle concerne uniquement la documentation ou la traduction.
 
-# 19/01/2022
+## 2024-05-01
 
-- Optimisations V4.2
-
-# 20/11/2020
-
-- Présentation officielle V4
-- Ajouts d'éléments d'informations et de paramètres pour les commandes
-
-# 16/11/2020
-
-- version minimale Jeedom: 3.3.39 (dernière MAJ critique)
-
-# 04/11/2020
-
-- Nouvelle présentation de la liste des objets
-
-# 07/08/2020
-
-- Ajout de commentaires
-
-# 17/05/2020
-
-- Mise à jour de la documentation
+- Version initiale du plugin Estar Energy.
+- Authentification au portail Estar Power et récupération des données principales (production, consommation, échanges réseau, indicateurs CO₂).
+- Création automatique des commandes infos et historisation par défaut.
+- Rafraîchissement automatique toutes les 5 minutes conformément aux limitations Estar Power.

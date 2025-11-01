@@ -1,25 +1,38 @@
-# Template de plugin pour Jeedom
+# Plugin Estar Energy pour Jeedom
 
-Ce "template de plugin" sert de base à la réalisation de plugins pour **Jeedom**.
+Le plugin **Estar Energy** permet de récupérer automatiquement les données de production et de consommation publiées sur le portail Estar Power. Il se connecte périodiquement au site officiel (aucune API publique n'est disponible) pour mettre à jour vos équipements Jeedom avec les informations suivantes : puissance photovoltaïque, consommation, échanges réseau, production journalière/mensuelle/annuelle, compensation carbone, etc.
 
-La documentation générale relative à la conception de plugin est consultable [ici](https://doc.jeedom.com/fr_FR/dev/). Dans le détail :   
-* [Utilisation du template de plugin](https://doc.jeedom.com/fr_FR/dev/plugin_template) : Le template de plugin est une base de plugin pour Jeedom qui doit être adaptée avec l'id de votre plugin et à laquelle il suffit d'ajouter vos propres fonctions. 
-* [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Intégré depuis la version 3.0 de Jeedom, le fichier **info.json** est obligatoire pour le bon fonctionnement des plugins et leur bon déploiement sur le Market Jeedom.
-* [Icône du plugin](https://doc.jeedom.com/fr_FR/dev/Icone_de_plugin) : Afin de pouvoir être publié sur le Market Jeedom, tout plugin doit disposer d’une icône. Attention à ne pas utiliser le même code couleur que les icônes des plugins Jeedom officiels.
-* [Widget du plugin](https://doc.jeedom.com/fr_FR/dev/widget_plugin) : Présentation des différentes manières d'inclure des widgets personnalisés au plugin.
-* [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Présentation de la mise en place d'une documentation car un bon plugin n'est rien sans documentation adéquate.
-* [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Description des pré-requis indispensables à la publication du plugin.
+## Fonctionnement
 
----
-Si vous créez une branch nommée prettier, le robot workflows fera une passe complete sur le code pour que le code soit le plus uniforme possible.
----
-test workflow en cours... for commit
+* Authentification : saisissez votre identifiant et votre mot de passe Estar Power dans la configuration du plugin.
+* Équipement : pour chaque centrale à superviser, créez un équipement et indiquez son identifiant "SID" (visible dans l'URL du portail Estar Power).
+* Actualisation : le plugin déclenche automatiquement la collecte des données toutes les 5 minutes afin de respecter les limitations du portail Estar Power.
 
----
-Nouvel assistant pour un gain de temps à la création de votre plugin
----
-Sur votre terminal, vous pouvez vous rendre dans plugin_info, et executer : php helperConfiguration.php
-Un assistant en CLI vous posera quelques questions, (l'id du plugin, la catégorie, si démon, etcc), puis s'occupera de renommer tous les fichiers et le reste.
-Voila, votre plugin est basiquement prêt pour coder votre travail.
+## Commandes créées
 
+Chaque équipement met à disposition les commandes infos suivantes :
 
+| Commande | Description |
+| --- | --- |
+| `Pv_power` | Puissance instantanée produite par les panneaux (W) |
+| `Load_power` | Puissance instantanée consommée par l'installation (W) |
+| `Grid_power` | Puissance instantanée échangée avec le réseau (W) |
+| `meter_b_in_eq` | Énergie importée depuis le réseau (Wh) |
+| `meter_b_out_eq` | Énergie exportée vers le réseau (Wh) |
+| `self_eq` | Autoconsommation/autoproduction (Wh) |
+| `today_eq` | Production du jour (Wh) |
+| `month_eq` | Production du mois (Wh) |
+| `year_eq` | Production de l'année (Wh) |
+| `total_eq` | Production totale (Wh) |
+| `plant_tree` | Nombre d'arbres compensés |
+| `co2_emission_reduction` | Réduction estimée des émissions de CO₂ (kg) |
+
+## Prérequis
+
+* Jeedom v4.2 ou supérieure.
+* Compte utilisateur actif sur le portail Estar Power.
+
+## Notes
+
+* Les identifiants saisis sont utilisés exclusivement pour récupérer un jeton d'accès auprès du portail Estar Power. Le jeton est conservé temporairement en cache et renouvelé automatiquement lorsqu'il expire.
+* Le plugin n'a pas besoin de dépendances ni de démon supplémentaire.
