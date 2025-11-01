@@ -51,6 +51,27 @@ class estarenergy extends eqLogic {
         }
     }
 
+    public static function registerCron(): void {
+        $cron = cron::byClassAndFunction(__CLASS__, 'cron5');
+        if (!is_object($cron)) {
+            $cron = new cron();
+            $cron->setClass(__CLASS__);
+            $cron->setFunction('cron5');
+        }
+
+        $cron->setEnable(1);
+        $cron->setDeamon(0);
+        $cron->setSchedule('*/5 * * * *');
+        $cron->save();
+    }
+
+    public static function removeCron(): void {
+        $cron = cron::byClassAndFunction(__CLASS__, 'cron5');
+        if (is_object($cron)) {
+            $cron->remove();
+        }
+    }
+
     /*     * *********************Méthodes d'instance************************* */
 
     public function postSave() {
