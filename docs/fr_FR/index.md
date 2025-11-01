@@ -6,9 +6,11 @@ Le plugin **Estar Energy** permet de collecter les informations disponibles sur 
 
 1. **Identifiants globaux** : dans la configuration du plugin, indiquez l'identifiant et le mot de passe utilisés sur https://monitor.estarpower.com.
 2. **Création d'un équipement** : dans l'onglet du plugin, ajoutez un nouvel équipement puis saisissez le SID de la centrale à superviser (visible dans l'URL du portail Estar Power).
+
+   ![Localisation du SID](images/station-id-url.svg)
 3. **Sauvegarde** : enregistrez l'équipement ; toutes les commandes infos sont créées automatiquement.
 
-Le plugin interroge le portail toutes les 5 minutes. Une cadence plus rapide est déconseillée afin d'éviter les limitations imposées par Estar Power.
+Le plugin interroge le portail selon la fréquence définie dans la configuration (5, 10, 30 ou 60 minutes). Une cadence plus rapide est déconseillée afin d'éviter les limitations imposées par Estar Power.
 
 ## Commandes disponibles
 
@@ -28,6 +30,8 @@ Chaque équipement expose les commandes infos suivantes :
 * `co2_emission_reduction` : estimation de la réduction d'émissions de CO₂ (kg)
 
 Toutes les commandes sont historisées par défaut pour faciliter le suivi énergétique.
+
+Une commande action `Actualiser` est également disponible sur chaque équipement pour lancer immédiatement une synchronisation sans attendre la prochaine exécution du cron.
 
 ## Dépannage
 

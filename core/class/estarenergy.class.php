@@ -40,6 +40,7 @@ class estarenergy extends eqLogic {
         'plant_tree' => ['plant_tree', 'Arbres'],
         'co2_emission_reduction' => ['co2_emission_reduction', 'kg'],
     ];
+    private const ACTION_REFRESH = 'refresh_action';
 
     /*     * ***********************Methode static*************************** */
 
@@ -92,6 +93,19 @@ class estarenergy extends eqLogic {
             $cmd->setIsHistorized(1);
             $cmd->save();
         }
+
+        $refreshCmd = $this->getCmd(null, self::ACTION_REFRESH);
+        if (!is_object($refreshCmd)) {
+            $refreshCmd = new estarenergyCmd();
+            $refreshCmd->setEqLogic_id($this->getId());
+            $refreshCmd->setLogicalId(self::ACTION_REFRESH);
+        }
+        $refreshCmd->setName(__('Actualiser', __FILE__));
+        $refreshCmd->setType('action');
+        $refreshCmd->setSubType('other');
+        $refreshCmd->setIsHistorized(0);
+        $refreshCmd->setDisplay('icon', 'fas fa-sync-alt');
+        $refreshCmd->save();
 
         try {
             self::updateStationData($this, false);
@@ -155,6 +169,10 @@ class estarenergy extends eqLogic {
             $cron->setSchedule($desiredSchedule);
             $cron->save();
         }
+    }
+
+    public static function postConfig_update($values) {
+        self::registerCron();
     }
 
     private static function applyDataToEqLogic(estarenergy $eqLogic, array $payload): void {
@@ -329,4 +347,18 @@ class estarenergy extends eqLogic {
 }
 
 class estarenergyCmd extends cmd {
+    public function execute($_options = array()) {
+        if ($this->getType() !== 'action') {
+            throw new Exception(__('Cette commande n\'est pas exécutable', __FILE__));
+        }
+
+        $eqLogic = $this->getEqLogic();
+        if (!is_object($eqLogic)) {
+            throw new Exception(__('Équipement introuvable', __FILE__));
+        }
+
+        $eqLogic->refresh();
+
+        return true;
+    }
 }

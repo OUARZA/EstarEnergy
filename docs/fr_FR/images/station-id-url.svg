@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="200" viewBox="0 0 960 200" role="img" aria-labelledby="title desc">
+  <title id="title">Localisation de l'identifiant de centrale Estar Power</title>
+  <desc id="desc">Capture stylisée du navigateur indiquant l'URL contenant l'identifiant de la centrale.</desc>
+  <rect width="960" height="200" fill="#2b2b2b" rx="12"/>
+  <rect x="0" y="0" width="960" height="54" fill="#3c1a1a" rx="12"/>
+  <rect x="24" y="74" width="912" height="58" fill="#1f3c1a" rx="8"/>
+  <text x="480" y="110" fill="#f7f7f7" font-size="24" text-anchor="middle" font-family="'DejaVu Sans', Arial, sans-serif">
+    https://monitor.estarpower.com/platform/station/view/detail?id=4273504
+  </text>
+  <path d="M 480 140 L 500 170 L 460 170 Z" fill="#f2c94c"/>
+  <rect x="445" y="170" width="70" height="10" fill="#f2c94c" rx="5"/>
+  <text x="480" y="190" fill="#f2c94c" font-size="18" text-anchor="middle" font-family="'DejaVu Sans', Arial, sans-serif">
+    Identifiant de la centrale (SID)
+  </text>
+</svg>

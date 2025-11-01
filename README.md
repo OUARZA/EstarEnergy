@@ -6,7 +6,9 @@ Le plugin **Estar Energy** permet de récupérer automatiquement les données de
 
 * Authentification : saisissez votre identifiant et votre mot de passe Estar Power dans la configuration du plugin.
 * Équipement : pour chaque centrale à superviser, créez un équipement et indiquez son identifiant "SID" (visible dans l'URL du portail Estar Power).
-* Actualisation : le plugin déclenche automatiquement la collecte des données toutes les 5 minutes afin de respecter les limitations du portail Estar Power.
+
+![Localisation du SID](docs/fr_FR/images/station-id-url.svg)
+* Actualisation : le plugin déclenche automatiquement la collecte des données toutes les 5 minutes afin de respecter les limitations du portail Estar Power. Une commande action `Actualiser` permet également de lancer manuellement la synchronisation à tout moment.
 
 ## Commandes créées
 
