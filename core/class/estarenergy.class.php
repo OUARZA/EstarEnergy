@@ -23,6 +23,8 @@ class estarenergy extends eqLogic {
     private const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
     private const TOKEN_CACHE_KEY = 'estarenergy::auth';
     private const TOKEN_MAX_AGE = 3600; // 1 hour
+    private const DEFAULT_REFRESH_INTERVAL = 5; // minutes
+    private const ALLOWED_REFRESH_INTERVALS = [5, 10, 30, 60];
 
     private const COMMANDS = [
         'pv_power' => ['Pv_power', 'W'],
@@ -42,6 +44,7 @@ class estarenergy extends eqLogic {
     /*     * ***********************Methode static*************************** */
 
     public static function cron5() {
+        self::applyConfiguredSchedule();
         foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
             try {
                 $eqLogic->refresh();
@@ -61,7 +64,7 @@ class estarenergy extends eqLogic {
 
         $cron->setEnable(1);
         $cron->setDeamon(0);
-        $cron->setSchedule('*/5 * * * *');
+        $cron->setSchedule(self::getCronSchedule(self::getRefreshInterval()));
         $cron->save();
     }
 
@@ -121,6 +124,37 @@ class estarenergy extends eqLogic {
         }
 
         self::applyDataToEqLogic($eqLogic, $payload);
+    }
+
+    private static function getRefreshInterval(): int {
+        $configuredInterval = (int) config::byKey('refresh_interval', 'estarenergy', self::DEFAULT_REFRESH_INTERVAL);
+        if (!in_array($configuredInterval, self::ALLOWED_REFRESH_INTERVALS, true)) {
+            return self::DEFAULT_REFRESH_INTERVAL;
+        }
+
+        return $configuredInterval;
+    }
+
+    private static function getCronSchedule(int $intervalMinutes): string {
+        if ($intervalMinutes === 60) {
+            return '0 * * * *';
+        }
+
+        return sprintf('*/%d * * * *', $intervalMinutes);
+    }
+
+    private static function applyConfiguredSchedule(): void {
+        $cron = cron::byClassAndFunction(__CLASS__, 'cron5');
+        if (!is_object($cron)) {
+            self::registerCron();
+            return;
+        }
+
+        $desiredSchedule = self::getCronSchedule(self::getRefreshInterval());
+        if ($cron->getSchedule() !== $desiredSchedule) {
+            $cron->setSchedule($desiredSchedule);
+            $cron->save();
+        }
     }
 
     private static function applyDataToEqLogic(estarenergy $eqLogic, array $payload): void {

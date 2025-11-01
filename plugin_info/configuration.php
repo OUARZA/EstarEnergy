@@ -40,5 +40,18 @@ if (!isConnect()) {
         <input class="configKey form-control" data-l1key="password" type="password" autocomplete="off" />
       </div>
     </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Fréquence de rafraîchissement}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Intervalle entre chaque synchronisation automatique des équipements.}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <select class="configKey form-control" data-l1key="refresh_interval">
+          <option value="5">{{Toutes les 5 minutes}}</option>
+          <option value="10">{{Toutes les 10 minutes}}</option>
+          <option value="30">{{Toutes les 30 minutes}}</option>
+          <option value="60">{{Toutes les 60 minutes}}</option>
+        </select>
+      </div>
+    </div>
   </fieldset>
 </form>
