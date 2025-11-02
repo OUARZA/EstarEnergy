@@ -55,7 +55,7 @@ class estarenergy extends eqLogic {
         }
     }
 
-    public static function registerCron(): void {
+    public static function registerCron(?int $interval = null): void {
         $cron = cron::byClassAndFunction(__CLASS__, 'cron5');
         if (!is_object($cron)) {
             $cron = new cron();
@@ -65,7 +65,10 @@ class estarenergy extends eqLogic {
 
         $cron->setEnable(1);
         $cron->setDeamon(0);
-        $cron->setSchedule(self::getCronSchedule(self::getRefreshInterval()));
+        $schedule = self::getCronSchedule($interval ?? self::getRefreshInterval());
+        if ($cron->getSchedule() !== $schedule) {
+            $cron->setSchedule($schedule);
+        }
         $cron->save();
     }
 
@@ -114,8 +117,8 @@ class estarenergy extends eqLogic {
         }
     }
 
-    public function refresh() {
-        self::updateStationData($this, false);
+    public function refresh($_force = false) {
+        self::updateStationData($this, (bool) $_force);
     }
 
     private static function updateStationData(estarenergy $eqLogic, bool $forceToken) {
@@ -137,16 +140,19 @@ class estarenergy extends eqLogic {
             return;
         }
 
+        if (!isset($payload['data']) || !is_array($payload['data'])) {
+            log::add('estarenergy', 'error', sprintf(__('Structure de données inattendue pour %s', __FILE__), $eqLogic->getHumanName()));
+            log::add('estarenergy', 'debug', json_encode($payload));
+            return;
+        }
+
         self::applyDataToEqLogic($eqLogic, $payload);
     }
 
     private static function getRefreshInterval(): int {
         $configuredInterval = (int) config::byKey('refresh_interval', 'estarenergy', self::DEFAULT_REFRESH_INTERVAL);
-        if (!in_array($configuredInterval, self::ALLOWED_REFRESH_INTERVALS, true)) {
-            return self::DEFAULT_REFRESH_INTERVAL;
-        }
 
-        return $configuredInterval;
+        return self::normalizeRefreshInterval($configuredInterval);
     }
 
     private static function getCronSchedule(int $intervalMinutes): string {
@@ -172,7 +178,32 @@ class estarenergy extends eqLogic {
     }
 
     public static function postConfig_update($values) {
-        self::registerCron();
+        if (isset($values['refresh_interval'])) {
+            $interval = self::normalizeRefreshInterval((int) $values['refresh_interval']);
+            config::save('refresh_interval', $interval, 'estarenergy');
+            self::registerCron($interval);
+        } else {
+            self::registerCron();
+        }
+
+        cache::set(self::TOKEN_CACHE_KEY, []);
+        self::resetCookieFile();
+
+        foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
+            try {
+                $eqLogic->refresh(true);
+            } catch (Exception $exception) {
+                log::add('estarenergy', 'error', sprintf(__('Impossible d\'actualiser %s après la sauvegarde de la configuration : %s', __FILE__), $eqLogic->getHumanName(), $exception->getMessage()));
+            }
+        }
+    }
+
+    private static function normalizeRefreshInterval(int $interval): int {
+        if (!in_array($interval, self::ALLOWED_REFRESH_INTERVALS, true)) {
+            return self::DEFAULT_REFRESH_INTERVAL;
+        }
+
+        return $interval;
     }
 
     private static function applyDataToEqLogic(estarenergy $eqLogic, array $payload): void {
@@ -194,6 +225,7 @@ class estarenergy extends eqLogic {
             'self_eq' => $stationData,
         ];
 
+        $updated = false;
         foreach ($mapping as $logicalId => $source) {
             if (!is_array($source) || !array_key_exists($logicalId, $source)) {
                 continue;
@@ -202,7 +234,14 @@ class estarenergy extends eqLogic {
             if (!is_numeric($value)) {
                 continue;
             }
-            $eqLogic->checkAndUpdateCmd($logicalId, (float) $value);
+            if ($eqLogic->checkAndUpdateCmd($logicalId, (float) $value)) {
+                $updated = true;
+            }
+        }
+
+        if (!$updated) {
+            log::add('estarenergy', 'warning', sprintf(__('Aucune mesure valide n\'a été trouvée pour %s', __FILE__), $eqLogic->getHumanName()));
+            log::add('estarenergy', 'debug', json_encode($payload));
         }
     }
 
@@ -215,7 +254,7 @@ class estarenergy extends eqLogic {
 
         $response = self::callApi(self::DATA_URL, [
             'body' => [
-                'sid' => (int) $stationId,
+                'sid' => is_numeric($stationId) ? (int) $stationId : $stationId,
                 'mode' => 1,
                 'date' => date('Y-m-d'),
             ],
@@ -357,7 +396,8 @@ class estarenergyCmd extends cmd {
             throw new Exception(__('Équipement introuvable', __FILE__));
         }
 
-        $eqLogic->refresh();
+        log::add('estarenergy', 'info', sprintf(__('Commande %s exécutée pour %s', __FILE__), $this->getName(), $eqLogic->getHumanName()));
+        $eqLogic->refresh(true);
 
         return true;
     }
