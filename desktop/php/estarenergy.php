@@ -128,7 +128,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 
 							<legend><i class="fas fa-cogs"></i> {{Paramètres spécifiques}}</legend>
 								<div class="form-group">
-										<label class="col-sm-4 control-label">{{ID de la centrale}}
+										<label class="col-sm-4 control-label">{{L'identifiant de la centrale}}
 												<sup><i class="fas fa-question-circle tooltips" title="{{Renseignez l'identifiant de la centrale Estar récupéré sur monitor.estarpower.com}}"></i></sup>
 										</label>
 										<div class="col-sm-6">
