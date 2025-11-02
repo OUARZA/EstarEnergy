@@ -25,30 +25,31 @@ if (!isConnect()) {
 <form class="form-horizontal">
   <fieldset>
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Global param 1}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le paramètre 1 du plugin}}"></i></sup>
+      <label class="col-md-4 control-label">{{Identifiant Estar Power}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Identifiant de connexion sur le site Estar Power}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="param1"/>
+        <input class="configKey form-control" data-l1key="estarpower_login" placeholder="{{Identifiant}}"/>
       </div>
     </div>
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Global param 2}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le paramètre 2 du plugin}}"></i></sup>
+      <label class="col-md-4 control-label">{{Mot de passe Estar Power}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Mot de passe de connexion sur le site Estar Power}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="param2"/>
+        <input class="configKey form-control" data-l1key="estarpower_password" type="password" placeholder="{{Mot de passe}}"/>
       </div>
     </div>
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Global param 3}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Sélectionnez du paramètre 3 du plugin}}"></i></sup>
+      <label class="col-md-4 control-label">{{Fréquence d'actualisation}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Choisissez la fréquence de rafraîchissement recommandée : 5 minutes par défaut}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <select class="configKey form-control" data-l1key="param3">
-          <option value=""></option>
-          <option value="value1">value1</option>
-          <option value="value2">value2</option>
+        <select class="configKey form-control" data-l1key="estarpower_refresh">
+          <option value="cron5">{{Toutes les 5 minutes (préconisé)}}</option>
+          <option value="cron10">{{Toutes les 10 minutes}}</option>
+          <option value="cron30">{{Toutes les 30 minutes}}</option>
+          <option value="cronHourly">{{Toutes les heures}}</option>
         </select>
       </div>
     </div>
