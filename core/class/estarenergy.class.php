@@ -19,12 +19,12 @@
 require_once __DIR__ . '/../../../../core/php/core.inc.php';
 
 class estarenergy extends eqLogic {
-    private const DEFAULT_CRON_SCHEDULE = '*/5 * * * *';
-    private const ALLOWED_CRON_SCHEDULES = [
-        '*/5 * * * *' => true,
-        '*/10 * * * *' => true,
-        '*/30 * * * *' => true,
-        '0 * * * *' => true,
+    private const DEFAULT_CRON_KEY = 'Cron5';
+    private const CRON_SCHEDULES = [
+        'Cron5' => '*/5 * * * *',
+        'Cron10' => '*/10 * * * *',
+        'Cron30' => '*/30 * * * *',
+        'CronHourly' => '0 * * * *',
     ];
     private const LOGIN_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
     private const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
@@ -102,7 +102,8 @@ class estarenergy extends eqLogic {
     }
 
     public static function synchronizeCronTask(?string $preferredSchedule = null): bool {
-        $schedule = self::normalizeCronSchedule($preferredSchedule ?? self::getConfiguredSchedule());
+        $cronKey = self::normalizeCronKey($preferredSchedule ?? self::getConfiguredCronKey());
+        $schedule = self::getCronExpression($cronKey);
 
         $cron = cron::byClassAndFunction('estarenergy', 'refreshFromCron');
 
@@ -143,27 +144,45 @@ class estarenergy extends eqLogic {
     }
 
     public static function applyCronSchedule(string $schedule): void {
-        $normalizedSchedule = self::normalizeCronSchedule($schedule);
-        config::save('refresh_cron', $normalizedSchedule, 'estarenergy');
-        if (!self::synchronizeCronTask($normalizedSchedule)) {
-            throw new Exception(__('Impossible de mettre à jour la planification, vérifiez l\'expression cron.', __FILE__));
+        $normalizedCronKey = self::normalizeCronKey($schedule);
+        config::save('refresh_cron', $normalizedCronKey, 'estarenergy');
+        if (!self::synchronizeCronTask($normalizedCronKey)) {
+            throw new Exception(__('Impossible de mettre à jour la planification, vérifiez la sélection du cron.', __FILE__));
         }
     }
 
-    private static function getConfiguredSchedule(): string {
-        $schedule = trim((string) config::byKey('refresh_cron', 'estarenergy', self::DEFAULT_CRON_SCHEDULE));
+    private static function getConfiguredCronKey(): string {
+        $storedValue = trim((string) config::byKey('refresh_cron', 'estarenergy', self::DEFAULT_CRON_KEY));
+        $normalizedValue = self::normalizeCronKey($storedValue);
 
-        return self::normalizeCronSchedule($schedule);
+        if ($storedValue !== $normalizedValue) {
+            config::save('refresh_cron', $normalizedValue, 'estarenergy');
+        }
+
+        return $normalizedValue;
     }
 
-    private static function normalizeCronSchedule(string $schedule): string {
+    private static function normalizeCronKey(string $schedule): string {
         $schedule = trim($schedule);
 
-        if ($schedule === '' || !array_key_exists($schedule, self::ALLOWED_CRON_SCHEDULES)) {
-            return self::DEFAULT_CRON_SCHEDULE;
+        if ($schedule === '') {
+            return self::DEFAULT_CRON_KEY;
         }
 
-        return $schedule;
+        if (array_key_exists($schedule, self::CRON_SCHEDULES)) {
+            return $schedule;
+        }
+
+        $legacyKey = array_search($schedule, self::CRON_SCHEDULES, true);
+        if ($legacyKey !== false) {
+            return $legacyKey;
+        }
+
+        return self::DEFAULT_CRON_KEY;
+    }
+
+    private static function getCronExpression(string $cronKey): string {
+        return self::CRON_SCHEDULES[$cronKey] ?? self::CRON_SCHEDULES[self::DEFAULT_CRON_KEY];
     }
 
     private static function hasActiveCronTask(): bool {

@@ -46,10 +46,10 @@ if (!isConnect()) {
       </label>
       <div class="col-md-4">
         <select class="configKey form-control" data-l1key="refresh_cron">
-          <option value="*/5 * * * *">{{Toutes les 5 minutes}}</option>
-          <option value="*/10 * * * *">{{Toutes les 10 minutes}}</option>
-          <option value="*/30 * * * *">{{Toutes les 30 minutes}}</option>
-          <option value="0 * * * *">{{Toutes les 60 minutes}}</option>
+          <option value="Cron5">{{Toutes les 5 minutes}}</option>
+          <option value="Cron10">{{Toutes les 10 minutes}}</option>
+          <option value="Cron30">{{Toutes les 30 minutes}}</option>
+          <option value="CronHourly">{{Toutes les 60 minutes}}</option>
         </select>
       </div>
     </div>
@@ -67,23 +67,38 @@ if (!isConnect()) {
         return;
       }
       var allowedValues = {
-        '*/5 * * * *': true,
-        '*/10 * * * *': true,
-        '*/30 * * * *': true,
-        '0 * * * *': true
+        'Cron5': true,
+        'Cron10': true,
+        'Cron30': true,
+        'CronHourly': true
+      };
+      var legacyValues = {
+        '*/5 * * * *': 'Cron5',
+        '*/10 * * * *': 'Cron10',
+        '*/30 * * * *': 'Cron30',
+        '0 * * * *': 'CronHourly'
       };
       var current = ($field.val() || '').trim();
-      if (!allowedValues[current]) {
-        $field.val('*/5 * * * *');
+      if (allowedValues[current]) {
+        return;
       }
+      if (legacyValues[current]) {
+        $field.val(legacyValues[current]);
+        return;
+      }
+      $field.val('Cron5');
+    }
+
+    function getSelectedSchedule() {
+      var $field = getCronField();
+      if ($field.length) {
+        return ($field.val() || '').trim();
+      }
+      return '';
     }
 
     function applyCronUpdate() {
-      var schedule = '';
-      var $field = getCronField();
-      if ($field.length) {
-        schedule = ($field.val() || '').trim();
-      }
+      var schedule = getSelectedSchedule();
       $.ajax({
         type: 'POST',
         url: 'plugins/estarenergy/core/ajax/estarenergy.ajax.php',
