@@ -30,7 +30,7 @@ function estarenergy_update() {
 
 // Fonction exécutée automatiquement après la suppression du plugin
 function estarenergy_remove() {
-  $functions = array('pullData', 'cron5', 'cron10', 'cron15', 'cron30', 'cronHourly');
+  $functions = array('pullData', 'cron5', 'cron10', 'cron30', 'cronHourly');
   foreach ($functions as $function) {
     $cron = cron::byClassAndFunction('estarenergy', $function);
     if (is_object($cron)) {
