@@ -215,7 +215,12 @@ class estarenergy extends eqLogic {
       try {
         $eqLogic->refresh();
       } catch (Exception $e) {
-        log::add('estarenergy', 'error', __("Erreur lors de l'actualisation automatique : ", __FILE__) . $e->getMessage());
+        $message = sprintf(
+          __("Erreur lors de l'actualisation automatique de %s : %s", __FILE__),
+          $eqLogic->getHumanName(true, true),
+          $e->getMessage()
+        );
+        log::add('estarenergy', 'error', $message);
       }
     }
   }
