@@ -47,35 +47,35 @@ class estarenergy extends eqLogic {
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
   */
   public static function cron5() {
-    self::runScheduledRefresh();
+    self::runRefreshPresetIfConfigured('5min');
   }
 
   /*
   * Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
   */
   public static function cron10() {
-    self::runScheduledRefresh();
+    self::runRefreshPresetIfConfigured('10min');
   }
 
   /*
   * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
   */
   public static function cron15() {
-    self::runScheduledRefresh();
+    self::runRefreshPresetIfConfigured('15min');
   }
 
   /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
   */
   public static function cron30() {
-    self::runScheduledRefresh();
+    self::runRefreshPresetIfConfigured('30min');
   }
 
   /*
   * Fonction exécutée automatiquement toutes les heures par Jeedom
   */
   public static function cronHourly() {
-    self::runScheduledRefresh();
+    self::runRefreshPresetIfConfigured('hourly');
   }
 
   /*
@@ -96,37 +96,10 @@ class estarenergy extends eqLogic {
    * Applique la planification du cron à partir de la configuration du plugin.
    */
   public static function applyRefreshCron($value = null) {
-    if ($value === null) {
-      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
-    }
+    $value = self::normalizeRefreshSchedule($value);
 
-    $legacyValues = array(
-      'cron5' => '*/5 * * * *',
-      'cron10' => '*/10 * * * *',
-      'cron15' => '*/15 * * * *',
-      'cron30' => '*/30 * * * *',
-      'cronHourly' => '0 * * * *',
-    );
-
-    if (array_key_exists($value, $legacyValues)) {
-      $value = $legacyValues[$value];
-    }
-
-    $scheduleAliases = array(
-      '*/60 * * * *' => '0 * * * *',
-    );
-
-    if (array_key_exists($value, $scheduleAliases)) {
-      $value = $scheduleAliases[$value];
-    }
-
-    $functionBySchedule = array(
-      '*/5 * * * *' => 'cron5',
-      '*/10 * * * *' => 'cron10',
-      '*/15 * * * *' => 'cron15',
-      '*/30 * * * *' => 'cron30',
-      '0 * * * *' => 'cronHourly',
-    );
+    $presets = self::getRefreshSchedulePresets();
+    $functions = self::getRefreshScheduleHandlers();
 
     $legacyCron = cron::byClassAndFunction(__CLASS__, 'pullData');
     if (is_object($legacyCron)) {
@@ -134,7 +107,7 @@ class estarenergy extends eqLogic {
     }
 
     if (empty($value)) {
-      foreach ($functionBySchedule as $function) {
+      foreach ($functions as $function) {
         $cron = cron::byClassAndFunction(__CLASS__, $function);
         if (is_object($cron)) {
           $cron->remove();
@@ -143,13 +116,11 @@ class estarenergy extends eqLogic {
       return;
     }
 
-    $targetFunction = null;
-    if (array_key_exists($value, $functionBySchedule)) {
-      $targetFunction = $functionBySchedule[$value];
-    }
+    if (array_key_exists($value, $presets)) {
+      $targetFunction = $presets[$value]['handler'];
+      $schedule = $presets[$value]['cron'];
 
-    if ($targetFunction !== null) {
-      foreach ($functionBySchedule as $function) {
+      foreach ($functions as $function) {
         if ($function === $targetFunction) {
           continue;
         }
@@ -166,7 +137,7 @@ class estarenergy extends eqLogic {
         $cron->setFunction($targetFunction);
       }
 
-      $cron->setSchedule($value);
+      $cron->setSchedule($schedule);
       $cron->setEnable(1);
       $cron->setDeamon(0);
       $cron->setOnce(0);
@@ -186,6 +157,97 @@ class estarenergy extends eqLogic {
     $cron->setDeamon(0);
     $cron->setOnce(0);
     $cron->save();
+  }
+
+  private static function getConfiguredRefreshSchedule() {
+    return self::normalizeRefreshSchedule(null);
+  }
+
+  private static function normalizeRefreshSchedule($value) {
+    if ($value === null) {
+      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+    }
+
+    $value = trim((string) $value);
+    if ($value === '') {
+      return '';
+    }
+
+    foreach (self::getRefreshSchedulePresets() as $presetKey => $preset) {
+      $aliases = array($presetKey, isset($preset['cron']) ? $preset['cron'] : '');
+
+      if (isset($preset['handler'])) {
+        $aliases[] = $preset['handler'];
+      }
+
+      if (isset($preset['aliases']) && is_array($preset['aliases'])) {
+        $aliases = array_merge($aliases, $preset['aliases']);
+      }
+
+      $aliases = array_unique(array_filter(array_map('strval', $aliases), 'strlen'));
+      if (in_array($value, $aliases, true)) {
+        return $presetKey;
+      }
+    }
+
+    return $value;
+  }
+
+  private static function shouldRunScheduledRefresh($presetKey) {
+    if ($presetKey === '') {
+      return false;
+    }
+
+    if (!array_key_exists($presetKey, self::getRefreshSchedulePresets())) {
+      return false;
+    }
+
+    return self::getConfiguredRefreshSchedule() === $presetKey;
+  }
+
+  private static function runRefreshPresetIfConfigured($presetKey) {
+    if (self::shouldRunScheduledRefresh($presetKey)) {
+      self::runScheduledRefresh();
+    }
+  }
+
+  private static function getRefreshSchedulePresets() {
+    // Les noms de fonctions cron* sont imposés par Jeedom pour les exécutions périodiques automatiques.
+    // On centralise les correspondances ici pour éviter de dépendre implicitement de ces conventions.
+    return array(
+      '5min' => array(
+        'cron' => '*/5 * * * *',
+        'handler' => 'cron5',
+      ),
+      '10min' => array(
+        'cron' => '*/10 * * * *',
+        'handler' => 'cron10',
+      ),
+      '15min' => array(
+        'cron' => '*/15 * * * *',
+        'handler' => 'cron15',
+      ),
+      '30min' => array(
+        'cron' => '*/30 * * * *',
+        'handler' => 'cron30',
+      ),
+      'hourly' => array(
+        'cron' => '0 * * * *',
+        'handler' => 'cronHourly',
+        'aliases' => array('*/60 * * * *'),
+      ),
+    );
+  }
+
+  private static function getRefreshScheduleHandlers() {
+    $handlers = array();
+    foreach (self::getRefreshSchedulePresets() as $preset) {
+      if (isset($preset['handler'])) {
+        $handlers[] = $preset['handler'];
+      }
+    }
+
+    return array_values(array_unique($handlers));
   }
 
   /**
