@@ -1,6 +1,6 @@
 {
-	"id": "template",
-	"name": "Template",
+        "id": "estarenergy",
+        "name": "EstarEnergy",
 	"pluginVersion": "0.1",
 	"specialAttributes": {
 		"object": {
@@ -36,9 +36,9 @@
 			}
 		}
 	},
-	"description": {
-		"fr_FR": "Template servant de base à la création de plugins pour Jeedom"
-	},
+        "description": {
+                "fr_FR": "Plugin EstarEnergy pour Jeedom"
+        },
 	"licence": "AGPL",
 	"author": "Jeedom SAS",
 	"require": "4.2",
@@ -50,10 +50,10 @@
 	"hasDependency": false,
 	"hasOwnDeamon": false,
 	"maxDependancyInstallTime": 0,
-	"changelog_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/template\/beta\/changelog",
-	"changelog": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/template\/changelog",
-	"documentation_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/template\/beta",
-	"documentation": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/template",
+        "changelog_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/estarenergy\/beta\/changelog",
+        "changelog": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/estarenergy\/changelog",
+        "documentation_beta": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/estarenergy\/beta",
+        "documentation": "https:\/\/doc.jeedom.com\/#language#\/plugins\/programming\/estarenergy",
 	"link": {
 		"forum": "Lien vers le forum",
 		"video": "Lien vers une video"
