@@ -47,35 +47,45 @@ class estarenergy extends eqLogic {
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
   */
   public static function cron5() {
-    self::runScheduledRefresh();
+    if (self::shouldRunScheduledRefresh('*/5 * * * *')) {
+      self::runScheduledRefresh();
+    }
   }
 
   /*
   * Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
   */
   public static function cron10() {
-    self::runScheduledRefresh();
+    if (self::shouldRunScheduledRefresh('*/10 * * * *')) {
+      self::runScheduledRefresh();
+    }
   }
 
   /*
   * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
   */
   public static function cron15() {
-    self::runScheduledRefresh();
+    if (self::shouldRunScheduledRefresh('*/15 * * * *')) {
+      self::runScheduledRefresh();
+    }
   }
 
   /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
   */
   public static function cron30() {
-    self::runScheduledRefresh();
+    if (self::shouldRunScheduledRefresh('*/30 * * * *')) {
+      self::runScheduledRefresh();
+    }
   }
 
   /*
   * Fonction exécutée automatiquement toutes les heures par Jeedom
   */
   public static function cronHourly() {
-    self::runScheduledRefresh();
+    if (self::shouldRunScheduledRefresh('0 * * * *')) {
+      self::runScheduledRefresh();
+    }
   }
 
   /*
@@ -96,37 +106,9 @@ class estarenergy extends eqLogic {
    * Applique la planification du cron à partir de la configuration du plugin.
    */
   public static function applyRefreshCron($value = null) {
-    if ($value === null) {
-      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
-    }
+    $value = self::normalizeRefreshSchedule($value);
 
-    $legacyValues = array(
-      'cron5' => '*/5 * * * *',
-      'cron10' => '*/10 * * * *',
-      'cron15' => '*/15 * * * *',
-      'cron30' => '*/30 * * * *',
-      'cronHourly' => '0 * * * *',
-    );
-
-    if (array_key_exists($value, $legacyValues)) {
-      $value = $legacyValues[$value];
-    }
-
-    $scheduleAliases = array(
-      '*/60 * * * *' => '0 * * * *',
-    );
-
-    if (array_key_exists($value, $scheduleAliases)) {
-      $value = $scheduleAliases[$value];
-    }
-
-    $functionBySchedule = array(
-      '*/5 * * * *' => 'cron5',
-      '*/10 * * * *' => 'cron10',
-      '*/15 * * * *' => 'cron15',
-      '*/30 * * * *' => 'cron30',
-      '0 * * * *' => 'cronHourly',
-    );
+    $functionBySchedule = self::getRefreshScheduleFunctions();
 
     $legacyCron = cron::byClassAndFunction(__CLASS__, 'pullData');
     if (is_object($legacyCron)) {
@@ -186,6 +168,67 @@ class estarenergy extends eqLogic {
     $cron->setDeamon(0);
     $cron->setOnce(0);
     $cron->save();
+  }
+
+  private static function shouldRunScheduledRefresh($expectedSchedule) {
+    if ($expectedSchedule === '') {
+      return false;
+    }
+
+    return self::getConfiguredRefreshSchedule() === $expectedSchedule;
+  }
+
+  private static function getConfiguredRefreshSchedule() {
+    return self::normalizeRefreshSchedule(null);
+  }
+
+  private static function getRefreshScheduleFunctions() {
+    return array(
+      '*/5 * * * *' => 'cron5',
+      '*/10 * * * *' => 'cron10',
+      '*/15 * * * *' => 'cron15',
+      '*/30 * * * *' => 'cron30',
+      '0 * * * *' => 'cronHourly',
+    );
+  }
+
+  private static function getLegacyRefreshValues() {
+    return array(
+      'cron5' => '*/5 * * * *',
+      'cron10' => '*/10 * * * *',
+      'cron15' => '*/15 * * * *',
+      'cron30' => '*/30 * * * *',
+      'cronHourly' => '0 * * * *',
+    );
+  }
+
+  private static function getRefreshScheduleAliases() {
+    return array(
+      '*/60 * * * *' => '0 * * * *',
+    );
+  }
+
+  private static function normalizeRefreshSchedule($value) {
+    if ($value === null) {
+      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+    }
+
+    $value = trim((string) $value);
+    if ($value === '') {
+      return '';
+    }
+
+    $legacyValues = self::getLegacyRefreshValues();
+    if (array_key_exists($value, $legacyValues)) {
+      $value = $legacyValues[$value];
+    }
+
+    $scheduleAliases = self::getRefreshScheduleAliases();
+    if (array_key_exists($value, $scheduleAliases)) {
+      $value = $scheduleAliases[$value];
+    }
+
+    return $value;
   }
 
   /**
