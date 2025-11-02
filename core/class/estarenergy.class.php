@@ -66,9 +66,7 @@ class estarenergy extends eqLogic {
         $cron->setEnable(1);
         $cron->setDeamon(0);
         $schedule = self::getCronSchedule($interval ?? self::getRefreshInterval());
-        if ($cron->getSchedule() !== $schedule) {
-            $cron->setSchedule($schedule);
-        }
+        $cron->setSchedule($schedule);
         $cron->save();
     }
 
@@ -181,8 +179,10 @@ class estarenergy extends eqLogic {
         if (isset($values['refresh_interval'])) {
             $interval = self::normalizeRefreshInterval((int) $values['refresh_interval']);
             config::save('refresh_interval', $interval, 'estarenergy');
+            self::removeCron();
             self::registerCron($interval);
         } else {
+            self::removeCron();
             self::registerCron();
         }
 
@@ -259,28 +259,77 @@ class estarenergy extends eqLogic {
                 'date' => date('Y-m-d'),
             ],
             'WAITING_PROMISE' => true,
-        ], [
-            'Accept: application/json, text/plain, */*',
-            'Content-Type: application/json;charset=UTF-8',
-            'User-Agent: Mozilla/5.0',
-            'Cookie: estar_token=' . $token,
-        ], false);
+        ], self::buildDataHeaders($auth), false);
 
         $data = json_decode($response, true);
         if (!is_array($data)) {
             throw new Exception(__('Réponse invalide du service Estar Power', __FILE__));
         }
 
-        if (isset($data['code']) && (int) $data['code'] !== 200) {
+        if (self::isAuthenticationFailure($data)) {
             if ($forceToken) {
-                throw new Exception(sprintf(__('Code retour inattendu (%s)', __FILE__), $data['code']));
+                throw new Exception(self::extractErrorMessage($data));
             }
             cache::set(self::TOKEN_CACHE_KEY, []);
             self::resetCookieFile();
             return self::fetchData($stationId, true);
         }
 
+        if (isset($data['status']) && (string) $data['status'] !== '0') {
+            $message = self::extractErrorMessage($data);
+            if ($message === '') {
+                $message = __('Réponse inattendue du service Estar Power', __FILE__);
+            }
+            throw new Exception($message);
+        }
+
         return $data;
+    }
+
+    private static function buildDataHeaders(array $auth): array {
+        $token = $auth['token'] ?? '';
+
+        $headers = [
+            'Accept: application/json, text/plain, */*',
+            'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Content-Type: application/json;charset=UTF-8',
+            'Origin: https://monitor.estarpower.com',
+            'Referer: https://monitor.estarpower.com/platform/',
+            'User-Agent: Mozilla/5.0',
+        ];
+
+        if ($token !== '') {
+            $headers[] = 'Authorization: Bearer ' . $token;
+            $headers[] = 'token: ' . $token;
+            $headers[] = 'Cookie: estar_token=' . $token;
+        }
+
+        return $headers;
+    }
+
+    private static function isAuthenticationFailure(array $data): bool {
+        if (isset($data['code']) && (int) $data['code'] !== 200) {
+            return true;
+        }
+
+        if (isset($data['status']) && (string) $data['status'] === '401') {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function extractErrorMessage(array $data): string {
+        $message = '';
+        if (isset($data['message']) && is_string($data['message'])) {
+            $message = trim($data['message']);
+        }
+
+        if ($message === '' && isset($data['systemNotice']) && is_string($data['systemNotice'])) {
+            $message = trim($data['systemNotice']);
+        }
+
+        return $message;
     }
 
     private static function getAuthData(bool $forceRefresh): array {
@@ -333,6 +382,7 @@ class estarenergy extends eqLogic {
         $auth = [
             'token' => $data['data']['token'],
             'timestamp' => time(),
+            'payload' => $data['data'],
         ];
 
         cache::set(self::TOKEN_CACHE_KEY, $auth);
