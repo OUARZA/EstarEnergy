@@ -153,3 +153,4 @@ $eqLogics = eqLogic::byType($plugin->getId());
         </div>
 </div>
 <?php include_file('desktop', 'estarenergy', 'js', 'estarenergy');?>
+<?php include_file('desktop', 'plugin.template', 'js');?>
