@@ -22,6 +22,12 @@ class estarenergy extends eqLogic {
   const AUTH_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
   const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
   const TOKEN_MAX_AGE = 3600;
+  const REFRESH_CRON_OPTIONS = array(
+    'cron5' => '*/5 * * * *',
+    'cron10' => '*/10 * * * *',
+    'cron30' => '*/30 * * * *',
+    'cronHourly' => '0 * * * *',
+  );
   /*     * *************************Attributs****************************** */
 
   /*
@@ -45,33 +51,106 @@ class estarenergy extends eqLogic {
   
   /*
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
-  public static function cron5() {}
   */
+  public static function cron5() {
+    self::executeScheduledRefresh(__FUNCTION__);
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
-  public static function cron10() {}
   */
+  public static function cron10() {
+    self::executeScheduledRefresh(__FUNCTION__);
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
-  public static function cron15() {}
   */
+  public static function cron15() {
+    self::executeScheduledRefresh(__FUNCTION__);
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
-  public static function cron30() {}
   */
+  public static function cron30() {
+    self::executeScheduledRefresh(__FUNCTION__);
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les heures par Jeedom
-  public static function cronHourly() {}
   */
+  public static function cronHourly() {
+    self::executeScheduledRefresh(__FUNCTION__);
+  }
 
   /*
   * Fonction exécutée automatiquement tous les jours par Jeedom
-  public static function cronDaily() {}
   */
+  public static function cronDaily() {
+    self::executeScheduledRefresh(__FUNCTION__);
+  }
+
+  public static function postConfig_update() {
+    self::synchronizeRefreshCrons();
+  }
+
+  protected static function executeScheduledRefresh($origin) {
+    $configured = trim((string) config::byKey('estarpower_refresh', 'estarenergy', ''));
+    if ($configured === '' || $configured !== $origin) {
+      return;
+    }
+
+    $eqLogics = eqLogic::byType(__CLASS__, true);
+    if (!is_array($eqLogics) || count($eqLogics) === 0) {
+      log::add('estarenergy', 'debug', sprintf(__('Aucun équipement actif à actualiser (cron %s)', __FILE__), $origin));
+      return;
+    }
+
+    log::add('estarenergy', 'debug', sprintf(__('Déclenchement du cron %s pour %d équipement(s)', __FILE__), $origin, count($eqLogics)));
+
+    foreach ($eqLogics as $eqLogic) {
+      try {
+        $eqLogic->refresh();
+      } catch (Exception $e) {
+        log::add('estarenergy', 'error', sprintf(__('Erreur lors de l’actualisation %s : %s', __FILE__), $eqLogic->getHumanName(true, true), $e->getMessage()));
+      }
+    }
+  }
+
+  public static function synchronizeRefreshCrons($selected = null) {
+    if ($selected === null) {
+      $selected = trim((string) config::byKey('estarpower_refresh', 'estarenergy', ''));
+    } else {
+      $selected = trim((string) $selected);
+    }
+
+    foreach (self::REFRESH_CRON_OPTIONS as $function => $schedule) {
+      try {
+        $cron = cron::byClassAndFunction(__CLASS__, $function);
+        if (!is_object($cron)) {
+          $cron = new cron();
+          $cron->setClass(__CLASS__);
+          $cron->setFunction($function);
+        }
+
+        $cron->setSchedule($schedule);
+        $cron->setTimeout(1440);
+        $cron->setDeamon(0);
+        $cron->setEnable($selected === $function ? 1 : 0);
+        $cron->save();
+      } catch (Exception $e) {
+        log::add('estarenergy', 'error', sprintf(__('Impossible de configurer le cron %s : %s', __FILE__), $function, $e->getMessage()));
+      }
+    }
+
+    if ($selected === '' || !array_key_exists($selected, self::REFRESH_CRON_OPTIONS)) {
+      log::add('estarenergy', 'info', __('Rafraîchissement automatique désactivé', __FILE__));
+      return;
+    }
+
+    log::add('estarenergy', 'info', sprintf(__('Rafraîchissement automatique configuré (%s)', __FILE__), $selected));
+  }
   
   /*
   * Permet de déclencher une action avant modification d'une variable de configuration du plugin
@@ -521,6 +600,7 @@ class estarenergy extends eqLogic {
     message::add('estarenergy', $detailedMessage);
 
     config::save('estarpower_refresh', '', 'estarenergy');
+    self::synchronizeRefreshCrons('');
   }
 }
 
