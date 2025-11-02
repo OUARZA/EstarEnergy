@@ -37,11 +37,9 @@ class estarenergy extends eqLogic {
 
   /*
   * Fonction exécutée automatiquement toutes les minutes par Jeedom
+  public static function cron() {}
   */
-  public static function cron() {
-    self::runScheduledRefresh();
-  }
-
+  
   /*
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
   */
