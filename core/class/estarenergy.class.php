@@ -37,33 +37,45 @@ class estarenergy extends eqLogic {
 
   /*
   * Fonction exécutée automatiquement toutes les minutes par Jeedom
-  public static function cron() {}
   */
+  public static function cron() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
-  public static function cron5() {}
   */
+  public static function cron5() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
-  public static function cron10() {}
   */
+  public static function cron10() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
-  public static function cron15() {}
   */
+  public static function cron15() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
-  public static function cron30() {}
   */
+  public static function cron30() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les heures par Jeedom
-  public static function cronHourly() {}
   */
+  public static function cronHourly() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement tous les jours par Jeedom
@@ -99,15 +111,69 @@ class estarenergy extends eqLogic {
       $value = $legacyValues[$value];
     }
 
-    $cron = cron::byClassAndFunction(__CLASS__, 'pullData');
+    $scheduleAliases = array(
+      '*/60 * * * *' => '0 * * * *',
+    );
+
+    if (array_key_exists($value, $scheduleAliases)) {
+      $value = $scheduleAliases[$value];
+    }
+
+    $functionBySchedule = array(
+      '*/5 * * * *' => 'cron5',
+      '*/10 * * * *' => 'cron10',
+      '*/15 * * * *' => 'cron15',
+      '*/30 * * * *' => 'cron30',
+      '0 * * * *' => 'cronHourly',
+    );
+
+    $legacyCron = cron::byClassAndFunction(__CLASS__, 'pullData');
+    if (is_object($legacyCron)) {
+      $legacyCron->remove();
+    }
 
     if (empty($value)) {
-      if (is_object($cron)) {
-        $cron->remove();
+      foreach ($functionBySchedule as $function) {
+        $cron = cron::byClassAndFunction(__CLASS__, $function);
+        if (is_object($cron)) {
+          $cron->remove();
+        }
       }
       return;
     }
 
+    $targetFunction = null;
+    if (array_key_exists($value, $functionBySchedule)) {
+      $targetFunction = $functionBySchedule[$value];
+    }
+
+    if ($targetFunction !== null) {
+      foreach ($functionBySchedule as $function) {
+        if ($function === $targetFunction) {
+          continue;
+        }
+        $cron = cron::byClassAndFunction(__CLASS__, $function);
+        if (is_object($cron)) {
+          $cron->remove();
+        }
+      }
+
+      $cron = cron::byClassAndFunction(__CLASS__, $targetFunction);
+      if (!is_object($cron)) {
+        $cron = new cron();
+        $cron->setClass(__CLASS__);
+        $cron->setFunction($targetFunction);
+      }
+
+      $cron->setSchedule($value);
+      $cron->setEnable(1);
+      $cron->setDeamon(0);
+      $cron->setOnce(0);
+      $cron->save();
+      return;
+    }
+
+    $cron = cron::byClassAndFunction(__CLASS__, 'pullData');
     if (!is_object($cron)) {
       $cron = new cron();
       $cron->setClass(__CLASS__);
@@ -132,6 +198,13 @@ class estarenergy extends eqLogic {
    * Fonction exécutée par le cron configuré dynamiquement.
    */
   public static function pullData() {
+    self::runScheduledRefresh();
+  }
+
+  /**
+   * Rafraîchit tous les équipements gérés par le cron.
+   */
+  private static function runScheduledRefresh() {
     foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
       if (!($eqLogic instanceof self)) {
         continue;
@@ -140,7 +213,12 @@ class estarenergy extends eqLogic {
       try {
         $eqLogic->refresh();
       } catch (Exception $e) {
-        log::add('estarenergy', 'error', __("Erreur lors de l'actualisation automatique : ", __FILE__) . $e->getMessage());
+        $message = sprintf(
+          __("Erreur lors de l'actualisation automatique de %s : %s", __FILE__),
+          $eqLogic->getHumanName(true, true),
+          $e->getMessage()
+        );
+        log::add('estarenergy', 'error', $message);
       }
     }
   }
