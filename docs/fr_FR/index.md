@@ -1,18 +1,17 @@
-# Plugin template
+# Plugin EstarEnergy
 
-Ce "template de plugin" sert de base à la réalisation de plugins pour **Jeedom**.
+Bienvenue dans la documentation du plugin **EstarEnergy** pour **Jeedom**.
 
-La documentation générale relative à la conception de plugin est consultable [ici](https://doc.jeedom.com/fr_FR/dev/).
+Cette page présente les informations générales du plugin. Pour des guides détaillés concernant l'installation, la configuration et l'utilisation, référez-vous à la documentation officielle disponible sur le site de Jeedom.
 
-Dans le détail :   
-* [Utilisation du template de plugin](https://doc.jeedom.com/fr_FR/dev/plugin_template) : Le template de plugin est une base de plugin pour Jeedom qui doit être adaptée avec l'id de votre plugin et à laquelle il suffit d'ajouter vos propres fonctions.
+* [Documentation du plugin EstarEnergy](https://doc.jeedom.com/fr_FR/plugins/programming/estarenergy) : Description complète du plugin.
 
-* [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Intégré depuis la version 3.0 de Jeedom, le fichier **info.json** est obligatoire pour le bon fonctionnement des plugins et leur bon déploiement sur le Market Jeedom.
+* [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Détails sur la structure du fichier **info.json** utilisé par EstarEnergy.
 
-* [Icône du plugin](https://doc.jeedom.com/fr_FR/dev/Icone_de_plugin) : Afin de pouvoir être publié sur le Market Jeedom, tout plugin doit disposer d’une icône. Attention à ne pas utiliser le même code couleur que les icônes des plugins Jeedom officiels.
+* [Icône du plugin](https://doc.jeedom.com/fr_FR/dev/Icone_de_plugin) : Rappels sur la création d'une icône adaptée pour EstarEnergy.
 
-* [Widget du plugin](https://doc.jeedom.com/fr_FR/dev/widget_plugin) : Présentation des différentes manières d'inclure des widgets personnalisés au plugin.
+* [Widget du plugin](https://doc.jeedom.com/fr_FR/dev/widget_plugin) : Informations pour créer des widgets personnalisés compatibles avec EstarEnergy.
 
-* [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Présentation de la mise en place d'une documentation car un bon plugin n'est rien sans documentation adéquate.
+* [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Conseils pour maintenir une documentation complète du plugin.
 
-* [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Description des pré-requis indispensables à la publication du plugin.
+* [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Prérequis pour la publication du plugin EstarEnergy.
