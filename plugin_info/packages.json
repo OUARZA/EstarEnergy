@@ -8,13 +8,13 @@
     "requests" : {"reinstall" : true}
   },
   "npm": {
-    "plugins/template/ressources/demond"  : {}
+    "plugins/estarenergy/ressources/demond"  : {}
   },
   "composer": {
-       "plugins/template"  : {}
+       "plugins/estarenergy"  : {}
   },
   "yarn": {
-    "plugins/template/ressources/demond"  : {}
+    "plugins/estarenergy/ressources/demond"  : {}
   },
   "plugin": {
   },

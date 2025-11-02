@@ -1,18 +1,25 @@
-# Plugin template
+# Plugin Estar Energy
 
-Ce "template de plugin" sert de base à la réalisation de plugins pour **Jeedom**.
+Bienvenue dans la documentation du plugin **Estar Energy** pour Jeedom. Ce plugin a pour objectif de faciliter l'intégration de la plateforme Estar Energy dans votre installation domotique.
 
-La documentation générale relative à la conception de plugin est consultable [ici](https://doc.jeedom.com/fr_FR/dev/).
+## Fonctionnalités
 
-Dans le détail :   
-* [Utilisation du template de plugin](https://doc.jeedom.com/fr_FR/dev/plugin_template) : Le template de plugin est une base de plugin pour Jeedom qui doit être adaptée avec l'id de votre plugin et à laquelle il suffit d'ajouter vos propres fonctions.
+- Authentification au portail Estar Energy.
+- Récupération et exposition des données énergétiques sous forme d'équipements et de commandes Jeedom.
+- Interface de configuration dédiée.
 
-* [Fichier info.json](https://doc.jeedom.com/fr_FR/dev/structure_info_json) : Intégré depuis la version 3.0 de Jeedom, le fichier **info.json** est obligatoire pour le bon fonctionnement des plugins et leur bon déploiement sur le Market Jeedom.
+## Pré-requis
 
-* [Icône du plugin](https://doc.jeedom.com/fr_FR/dev/Icone_de_plugin) : Afin de pouvoir être publié sur le Market Jeedom, tout plugin doit disposer d’une icône. Attention à ne pas utiliser le même code couleur que les icônes des plugins Jeedom officiels.
+- Jeedom 4.2 ou supérieur.
+- Un compte actif Estar Energy.
 
-* [Widget du plugin](https://doc.jeedom.com/fr_FR/dev/widget_plugin) : Présentation des différentes manières d'inclure des widgets personnalisés au plugin.
+## Installation
 
-* [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Présentation de la mise en place d'une documentation car un bon plugin n'est rien sans documentation adéquate.
+1. Téléchargez le plugin depuis le Market ou installez-le depuis ce dépôt.
+2. Activez le plugin dans Jeedom.
+3. Renseignez vos identifiants Estar Energy dans la configuration du plugin.
+4. Créez vos équipements et commencez à synchroniser vos données.
 
-* [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Description des pré-requis indispensables à la publication du plugin.
+## Support
+
+Pour toute question, utilisez le forum ou les canaux de support Estar Energy.
