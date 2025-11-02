@@ -151,7 +151,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                                                 <div class="col-sm-12">
                                                                         <div class="alert alert-info" role="alert">
                                                                                 <strong>{{Où trouver l'identifiant de la centrale ?}}</strong>
-                                                                                <p>{{Connectez-vous à monitor.estarpower.com puis ouvrez votre centrale. L'identifiant attendu dans le champ ci-contre correspond à la valeur affichée après `detail-id` dans l'URL du navigateur.}}</p>
+                                                                                <p>{{Connectez-vous à <a href="https://monitor.estarpower.com">monitor.estarpower.com</a> puis ouvrez votre centrale. L'identifiant attendu dans le champ ci-contre correspond à la valeur affichée après `detail-id` dans l'URL du navigateur.}}</p>
                                                                                 <img src="plugins/estarenergy/desktop/img/monitor_station_id.png" class="img-responsive center-block img-thumbnail" alt="{{Extrait d'URL monitor.estarpower.com mettant en évidence le paramètre detail-id}}">
                                                                         </div>
                                                                 </div>
