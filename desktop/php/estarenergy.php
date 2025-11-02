@@ -164,15 +164,24 @@ $eqLogics = eqLogic::byType($plugin->getId());
 
 						<!-- Partie droite de l'onglet "Équipement" -->
 						<!-- Affiche un champ de commentaire par défaut mais vous pouvez y mettre ce que vous voulez -->
-						<div class="col-lg-6">
-							<legend><i class="fas fa-info"></i> {{Informations}}</legend>
-							<div class="form-group">
-								<label class="col-sm-4 control-label">{{Description}}</label>
-								<div class="col-sm-6">
-									<textarea class="form-control eqLogicAttr autogrow" data-l1key="comment"></textarea>
-								</div>
-							</div>
-						</div>
+                                                <div class="col-lg-6">
+                                                        <legend><i class="fas fa-info"></i> {{Informations}}</legend>
+                                                        <div class="form-group">
+                                                                <label class="col-sm-4 control-label">{{Description}}</label>
+                                                                <div class="col-sm-6">
+                                                                        <textarea class="form-control eqLogicAttr autogrow" data-l1key="comment"></textarea>
+                                                                </div>
+                                                        </div>
+                                                        <div class="form-group">
+                                                                <div class="col-sm-12">
+                                                                        <div class="alert alert-info" role="alert">
+                                                                                <strong>{{Où trouver l'identifiant de la centrale ?}}</strong>
+                                                                                <p>{{Connectez-vous à monitor.estarpower.com puis ouvrez votre centrale. L'identifiant attendu dans le champ ci-contre correspond à la valeur affichée après `detail-id` dans l'URL du navigateur.}}</p>
+                                                                                <img src="plugins/estarenergy/desktop/img/monitor_station_id.png" class="img-responsive center-block img-thumbnail" alt="{{Extrait d'URL monitor.estarpower.com mettant en évidence le paramètre detail-id}}">
+                                                                        </div>
+                                                                </div>
+                                                        </div>
+                                                </div>
 					</fieldset>
 				</form>
 			</div><!-- /.tabpanel #eqlogictab-->
