@@ -110,6 +110,8 @@ class estarenergy extends eqLogic {
 
     $functionBySchedule = self::getRefreshScheduleFunctions();
 
+    self::updateRefreshFunctionalities($value);
+
     $legacyCron = cron::byClassAndFunction(__CLASS__, 'pullData');
     if (is_object($legacyCron)) {
       $legacyCron->remove();
@@ -206,6 +208,25 @@ class estarenergy extends eqLogic {
     return array(
       '*/60 * * * *' => '0 * * * *',
     );
+  }
+
+  private static function updateRefreshFunctionalities($activeSchedule) {
+    $functionalities = array(
+      'functionality::cron' => null,
+      'functionality::cron5' => '*/5 * * * *',
+      'functionality::cron10' => '*/10 * * * *',
+      'functionality::cron15' => '*/15 * * * *',
+      'functionality::cron30' => '*/30 * * * *',
+      'functionality::cronHourly' => '0 * * * *',
+      'functionality::cronDaily' => null,
+    );
+
+    foreach ($functionalities as $key => $schedule) {
+      $enabled = ($schedule !== null && $schedule === $activeSchedule) ? 1 : 0;
+      if ((int) config::byKey($key, 'estarenergy', 0) !== $enabled) {
+        config::save($key, $enabled, 'estarenergy');
+      }
+    }
   }
 
   private static function normalizeRefreshSchedule($value) {
