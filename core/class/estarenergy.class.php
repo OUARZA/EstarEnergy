@@ -500,6 +500,11 @@ class estarenergy extends eqLogic {
     }
 
     $decoded = json_decode($response, true);
+    if (is_array($decoded) && isset($decoded['message']) && stripos($decoded['message'], 'failed logins exceeds the daily maximum limit') !== false) {
+      $this->handleDailyLoginFailureLimit($decoded['message']);
+      return null;
+    }
+
     if (!is_array($decoded) || !isset($decoded['data']['token'])) {
       log::add('estarenergy', 'error', __('Impossible d’extraire le token d’authentification', __FILE__));
       log::add('estarenergy', 'debug', sprintf(__('Réponse reçue lors de la récupération du token : %s', __FILE__), $response));
@@ -649,6 +654,16 @@ class estarenergy extends eqLogic {
     }
 
     log::add('estarenergy', 'debug', sprintf(__('Token Estar Power enregistré dans %s', __FILE__), $file));
+  }
+
+  protected function handleDailyLoginFailureLimit($apiMessage) {
+    $logMessage = __('Le nombre maximum de tentatives de connexion Estar Power a été atteint. Le cron est désactivé jusqu’à réactivation manuelle.', __FILE__);
+    $detailedMessage = $logMessage . ' (' . $apiMessage . ')';
+    log::add('estarenergy', 'error', $detailedMessage);
+    message::add('estarenergy', $detailedMessage);
+
+    config::save('estarpower_refresh', '', 'estarenergy');
+    self::applyRefreshCron('');
   }
 }
 
