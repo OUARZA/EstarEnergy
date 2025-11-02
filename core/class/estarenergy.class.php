@@ -411,6 +411,7 @@ class estarenergy extends eqLogic {
     }
 
     if ($token === null) {
+      log::add('estarenergy', 'debug', __('Aucun jeton valide en cache, tentative de connexion à l’API Estar Power', __FILE__));
       $token = $this->retrieveToken($login, $password, $cookieFile);
     }
 
@@ -501,6 +502,7 @@ class estarenergy extends eqLogic {
     $decoded = json_decode($response, true);
     if (!is_array($decoded) || !isset($decoded['data']['token'])) {
       log::add('estarenergy', 'error', __('Impossible d’extraire le token d’authentification', __FILE__));
+      log::add('estarenergy', 'debug', sprintf(__('Réponse reçue lors de la récupération du token : %s', __FILE__), $response));
       return null;
     }
 
@@ -526,6 +528,8 @@ class estarenergy extends eqLogic {
       curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
     }
 
+    log::add('estarenergy', 'debug', sprintf(__('Appel HTTP vers %s', __FILE__), $url));
+
     $response = curl_exec($curl);
     if ($response === false) {
       log::add('estarenergy', 'error', sprintf('Erreur cURL (%s) : %s', $url, curl_error($curl)));
@@ -538,8 +542,11 @@ class estarenergy extends eqLogic {
 
     if ($httpCode !== 200) {
       log::add('estarenergy', 'error', sprintf('Erreur HTTP %d lors de l’appel %s', $httpCode, $url));
+      log::add('estarenergy', 'debug', sprintf(__('Réponse HTTP en erreur (%d) : %s', __FILE__), $httpCode, $response));
       return null;
     }
+
+    log::add('estarenergy', 'debug', sprintf(__('Réponse HTTP 200 reçue depuis %s', __FILE__), $url));
 
     return $response;
   }
@@ -599,27 +606,49 @@ class estarenergy extends eqLogic {
   protected function readSavedToken() {
     $file = $this->getTokenFilePath();
     if (!file_exists($file)) {
+      log::add('estarenergy', 'debug', __('Fichier de cache du jeton absent', __FILE__));
       return null;
     }
 
-    $content = json_decode(@file_get_contents($file), true);
+    $rawContent = @file_get_contents($file);
+    if ($rawContent === false || $rawContent === '') {
+      log::add('estarenergy', 'debug', __('Impossible de lire le fichier de cache du jeton', __FILE__));
+      return null;
+    }
+
+    $content = json_decode($rawContent, true);
     if (!is_array($content) || !isset($content['token'], $content['timestamp'])) {
+      log::add('estarenergy', 'debug', __('Structure de cache du jeton invalide', __FILE__));
       return null;
     }
 
     if ((time() - (int) $content['timestamp']) > self::TOKEN_MAX_AGE) {
+      log::add('estarenergy', 'debug', __('Jeton Estar Power expiré, une reconnexion est nécessaire', __FILE__));
       return null;
     }
 
+    log::add('estarenergy', 'debug', __('Jeton Estar Power valide trouvé dans le cache', __FILE__));
     return $content['token'];
   }
 
   protected function writeToken($token) {
     $file = $this->getTokenFilePath();
-    file_put_contents($file, json_encode(array(
+    $directory = dirname($file);
+    if (!is_dir($directory)) {
+      mkdir($directory, 0775, true);
+    }
+
+    $written = @file_put_contents($file, json_encode(array(
       'token' => $token,
       'timestamp' => time(),
     )));
+
+    if ($written === false) {
+      log::add('estarenergy', 'error', __('Impossible d’écrire le fichier de cache du token Estar Power', __FILE__));
+      return;
+    }
+
+    log::add('estarenergy', 'debug', sprintf(__('Token Estar Power enregistré dans %s', __FILE__), $file));
   }
 }
 
