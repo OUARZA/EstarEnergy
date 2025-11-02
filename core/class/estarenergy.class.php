@@ -100,7 +100,6 @@ class estarenergy extends eqLogic {
     }
 
     $legacyValues = array(
-      'cron' => '* * * * *',
       'cron5' => '*/5 * * * *',
       'cron10' => '*/10 * * * *',
       'cron15' => '*/15 * * * *',
@@ -121,7 +120,6 @@ class estarenergy extends eqLogic {
     }
 
     $functionBySchedule = array(
-      '* * * * *' => 'cron',
       '*/5 * * * *' => 'cron5',
       '*/10 * * * *' => 'cron10',
       '*/15 * * * *' => 'cron15',

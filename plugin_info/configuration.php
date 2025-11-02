@@ -46,7 +46,6 @@ if (!isConnect()) {
       </label>
       <div class="col-md-4">
         <select class="configKey form-control" data-l1key="estarpower_refresh">
-          <option value="* * * * *">{{Toutes les minutes}}</option>
           <option value="*/5 * * * *">{{Toutes les 5 minutes (préconisé)}}</option>
           <option value="*/10 * * * *">{{Toutes les 10 minutes}}</option>
           <option value="*/30 * * * *">{{Toutes les 30 minutes}}</option>
