@@ -19,6 +19,7 @@
 require_once __DIR__ . '/../../../../core/php/core.inc.php';
 
 class estarenergy extends eqLogic {
+    private const DEFAULT_CRON_SCHEDULE = '*/5 * * * *';
     private const LOGIN_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
     private const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
     private const TOKEN_CACHE_KEY = 'estarenergy::auth';
@@ -42,13 +43,17 @@ class estarenergy extends eqLogic {
     /*     * ***********************Methode static*************************** */
 
     public static function cron5() {
-        foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
-            try {
-                $eqLogic->refresh();
-            } catch (Exception $exception) {
-                log::add('estarenergy', 'error', sprintf(__('Erreur lors de la mise à jour de %s : %s', __FILE__), $eqLogic->getHumanName(), $exception->getMessage()));
-            }
+        self::synchronizeCronTask();
+
+        if (self::hasActiveCronTask()) {
+            return;
         }
+
+        self::refreshAllEquipments();
+    }
+
+    public static function refreshFromCron() {
+        self::refreshAllEquipments();
     }
 
     /*     * *********************Méthodes d'instance************************* */
@@ -78,6 +83,71 @@ class estarenergy extends eqLogic {
 
     public function refresh() {
         self::updateStationData($this, false);
+    }
+
+    private static function refreshAllEquipments(): void {
+        foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
+            try {
+                $eqLogic->refresh();
+            } catch (Exception $exception) {
+                log::add('estarenergy', 'error', sprintf(__('Erreur lors de la mise à jour de %s : %s', __FILE__), $eqLogic->getHumanName(), $exception->getMessage()));
+            }
+        }
+    }
+
+    public static function synchronizeCronTask(): bool {
+        $schedule = self::getConfiguredSchedule();
+
+        $cron = cron::byClassAndFunction('estarenergy', 'refreshFromCron');
+
+        $needSave = false;
+        if (!is_object($cron)) {
+            $cron = new cron();
+            $cron->setClass('estarenergy');
+            $cron->setFunction('refreshFromCron');
+            $cron->setOnce(0);
+            $needSave = true;
+        }
+
+        try {
+            if ($cron->getSchedule() !== $schedule) {
+                $cron->setSchedule($schedule);
+                $needSave = true;
+            }
+        } catch (Exception $exception) {
+            log::add('estarenergy', 'error', sprintf(__('Expression cron invalide "%s" : %s', __FILE__), $schedule, $exception->getMessage()));
+            return false;
+        }
+
+        if ($cron->getEnable() != 1) {
+            $cron->setEnable(1);
+            $needSave = true;
+        }
+
+        if ($cron->getTimeout() != 1440) {
+            $cron->setTimeout(1440);
+            $needSave = true;
+        }
+
+        if ($needSave) {
+            $cron->save();
+        }
+
+        return true;
+    }
+
+    private static function getConfiguredSchedule(): string {
+        $schedule = trim((string) config::byKey('refresh_cron', 'estarenergy', self::DEFAULT_CRON_SCHEDULE));
+        if ($schedule === '') {
+            return self::DEFAULT_CRON_SCHEDULE;
+        }
+
+        return $schedule;
+    }
+
+    private static function hasActiveCronTask(): bool {
+        $cron = cron::byClassAndFunction('estarenergy', 'refreshFromCron');
+        return is_object($cron) && $cron->getEnable() == 1;
     }
 
     private static function updateStationData(estarenergy $eqLogic, bool $forceToken) {

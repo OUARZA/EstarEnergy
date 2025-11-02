@@ -5,10 +5,11 @@ Le plugin **Estar Energy** permet de collecter les informations disponibles sur 
 ## Configuration du plugin
 
 1. **Identifiants globaux** : dans la configuration du plugin, indiquez l'identifiant et le mot de passe utilisés sur https://monitor.estarpower.com.
-2. **Création d'un équipement** : dans l'onglet du plugin, ajoutez un nouvel équipement puis saisissez le SID de la centrale à superviser (visible dans l'URL du portail Estar Power).
-3. **Sauvegarde** : enregistrez l'équipement ; toutes les commandes infos sont créées automatiquement.
+2. **Planification** : ajustez la fréquence d'interrogation via l'expression cron proposée (par défaut toutes les 5 minutes).
+3. **Création d'un équipement** : dans l'onglet du plugin, ajoutez un nouvel équipement puis saisissez le SID de la centrale à superviser (visible dans l'URL du portail Estar Power).
+4. **Sauvegarde** : enregistrez l'équipement ; toutes les commandes infos sont créées automatiquement.
 
-Le plugin interroge le portail toutes les 5 minutes. Une cadence plus rapide est déconseillée afin d'éviter les limitations imposées par Estar Power.
+Le plugin interroge le portail selon la planification définie (5 minutes par défaut). Une cadence trop rapide est déconseillée afin d'éviter les limitations imposées par Estar Power.
 
 ## Commandes disponibles
 

@@ -29,9 +29,16 @@ try {
   */
     ajax::init();
 
-
-
-    throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
+    switch (init('action')) {
+        case 'applyCronSchedule':
+            if (!estarenergy::synchronizeCronTask()) {
+                throw new Exception(__('Impossible de mettre à jour la planification, vérifiez l\'expression cron.', __FILE__));
+            }
+            ajax::success();
+            break;
+        default:
+            throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
+    }
     /*     * *********Catch exeption*************** */
 }
 catch (Exception $e) {
