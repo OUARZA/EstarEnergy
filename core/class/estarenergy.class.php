@@ -39,16 +39,36 @@ class estarenergy extends eqLogic {
         'co2_emission_reduction' => ['co2_emission_reduction', 'kg'],
     ];
 
+    private const DEFAULT_REFRESH_CRON = 'cron5';
+
     /*     * ***********************Methode static*************************** */
 
     public static function cron5() {
-        foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
-            try {
-                $eqLogic->refresh();
-            } catch (Exception $exception) {
-                log::add('estarenergy', 'error', sprintf(__('Erreur lors de la mise à jour de %s : %s', __FILE__), $eqLogic->getHumanName(), $exception->getMessage()));
-            }
+        if (!self::shouldRunCron(__FUNCTION__)) {
+            return;
         }
+        self::refreshAllEqLogics();
+    }
+
+    public static function cron10() {
+        if (!self::shouldRunCron(__FUNCTION__)) {
+            return;
+        }
+        self::refreshAllEqLogics();
+    }
+
+    public static function cron30() {
+        if (!self::shouldRunCron(__FUNCTION__)) {
+            return;
+        }
+        self::refreshAllEqLogics();
+    }
+
+    public static function cronHourly() {
+        if (!self::shouldRunCron(__FUNCTION__)) {
+            return;
+        }
+        self::refreshAllEqLogics();
     }
 
     /*     * *********************Méthodes d'instance************************* */
@@ -131,6 +151,25 @@ class estarenergy extends eqLogic {
             }
             $eqLogic->checkAndUpdateCmd($logicalId, (float) $value);
         }
+    }
+
+    private static function refreshAllEqLogics(): void {
+        foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
+            try {
+                $eqLogic->refresh();
+            } catch (Exception $exception) {
+                log::add('estarenergy', 'error', sprintf(__('Erreur lors de la mise à jour de %s : %s', __FILE__), $eqLogic->getHumanName(), $exception->getMessage()));
+            }
+        }
+    }
+
+    private static function shouldRunCron(string $cron): bool {
+        $configured = trim((string) config::byKey('refresh_cron', 'estarenergy', self::DEFAULT_REFRESH_CRON));
+        if ($configured === '') {
+            $configured = self::DEFAULT_REFRESH_CRON;
+        }
+
+        return $configured === $cron;
     }
 
     private static function fetchData(string $stationId, bool $forceToken): ?array {
