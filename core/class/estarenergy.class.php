@@ -45,38 +45,28 @@ class estarenergy extends eqLogic {
   
   /*
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
+  public static function cron5() {}
   */
-  public static function cron5() {
-    self::runScheduledRefresh();
-  }
 
   /*
   * Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
+  public static function cron10() {}
   */
-  public static function cron10() {
-    self::runScheduledRefresh();
-  }
 
   /*
   * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
+  public static function cron15() {}
   */
-  public static function cron15() {
-    self::runScheduledRefresh();
-  }
 
   /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
+  public static function cron30() {}
   */
-  public static function cron30() {
-    self::runScheduledRefresh();
-  }
 
   /*
   * Fonction exécutée automatiquement toutes les heures par Jeedom
+  public static function cronHourly() {}
   */
-  public static function cronHourly() {
-    self::runScheduledRefresh();
-  }
 
   /*
   * Fonction exécutée automatiquement tous les jours par Jeedom
@@ -91,28 +81,6 @@ class estarenergy extends eqLogic {
     return $value;
   }
   */
-
-  /**
-   * Rafraîchit tous les équipements gérés par le cron.
-   */
-  private static function runScheduledRefresh() {
-    foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
-      if (!($eqLogic instanceof self)) {
-        continue;
-      }
-
-      try {
-        $eqLogic->refresh();
-      } catch (Exception $e) {
-        $message = sprintf(
-          __("Erreur lors de l'actualisation automatique de %s : %s", __FILE__),
-          $eqLogic->getHumanName(true, true),
-          $e->getMessage()
-        );
-        log::add('estarenergy', 'error', $message);
-      }
-    }
-  }
 
   /*
    * Permet d'indiquer des éléments supplémentaires à remonter dans les informations de configuration
@@ -547,7 +515,7 @@ class estarenergy extends eqLogic {
   }
 
   protected function handleDailyLoginFailureLimit($apiMessage) {
-    $logMessage = __('Le nombre maximum de tentatives de connexion Estar Power a été atteint. Le cron est désactivé jusqu’à réactivation manuelle.', __FILE__);
+    $logMessage = __('Le nombre maximum de tentatives de connexion Estar Power a été atteint. Les actualisations automatiques sont suspendues jusqu’à réactivation manuelle.', __FILE__);
     $detailedMessage = $logMessage . ' (' . $apiMessage . ')';
     log::add('estarenergy', 'error', $detailedMessage);
     message::add('estarenergy', $detailedMessage);
