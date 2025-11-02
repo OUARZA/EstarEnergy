@@ -62,15 +62,6 @@ class estarenergy extends eqLogic {
   }
 
   /*
-  * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
-  */
-  public static function cron15() {
-    if (self::shouldRunScheduledRefresh('*/15 * * * *')) {
-      self::runScheduledRefresh();
-    }
-  }
-
-  /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
   */
   public static function cron30() {
@@ -106,9 +97,22 @@ class estarenergy extends eqLogic {
    * Applique la planification du cron à partir de la configuration du plugin.
    */
   public static function applyRefreshCron($value = null) {
-    $value = self::normalizeRefreshSchedule($value);
+    $rawValue = $value;
+    if ($rawValue === null) {
+      $rawValue = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+    }
+
+    $value = self::normalizeRefreshSchedule($rawValue);
+
+    if ($value !== $rawValue) {
+      config::save('estarpower_refresh', $value, 'estarenergy');
+    }
 
     $functionBySchedule = self::getRefreshScheduleFunctions();
+
+    self::updateRefreshFunctionalities($value);
+
+    self::removeDeprecatedCrons();
 
     $legacyCron = cron::byClassAndFunction(__CLASS__, 'pullData');
     if (is_object($legacyCron)) {
@@ -179,14 +183,15 @@ class estarenergy extends eqLogic {
   }
 
   private static function getConfiguredRefreshSchedule() {
-    return self::normalizeRefreshSchedule(null);
+    $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+
+    return self::normalizeRefreshSchedule($value);
   }
 
   private static function getRefreshScheduleFunctions() {
     return array(
       '*/5 * * * *' => 'cron5',
       '*/10 * * * *' => 'cron10',
-      '*/15 * * * *' => 'cron15',
       '*/30 * * * *' => 'cron30',
       '0 * * * *' => 'cronHourly',
     );
@@ -196,7 +201,6 @@ class estarenergy extends eqLogic {
     return array(
       'cron5' => '*/5 * * * *',
       'cron10' => '*/10 * * * *',
-      'cron15' => '*/15 * * * *',
       'cron30' => '*/30 * * * *',
       'cronHourly' => '0 * * * *',
     );
@@ -208,11 +212,40 @@ class estarenergy extends eqLogic {
     );
   }
 
-  private static function normalizeRefreshSchedule($value) {
-    if ($value === null) {
-      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+  private static function removeDeprecatedCrons() {
+    $deprecatedFunctions = array('cron15');
+
+    foreach ($deprecatedFunctions as $function) {
+      $cron = cron::byClassAndFunction(__CLASS__, $function);
+      if (is_object($cron)) {
+        $cron->remove();
+      }
+    }
+  }
+
+  private static function updateRefreshFunctionalities($activeSchedule) {
+    $functionalities = array(
+      'functionality::cron' => null,
+      'functionality::cron5' => '*/5 * * * *',
+      'functionality::cron10' => '*/10 * * * *',
+      'functionality::cron30' => '*/30 * * * *',
+      'functionality::cronHourly' => '0 * * * *',
+      'functionality::cronDaily' => null,
+    );
+
+    foreach ($functionalities as $key => $schedule) {
+      $enabled = ($schedule !== null && $schedule === $activeSchedule) ? 1 : 0;
+      if ((int) config::byKey($key, 'estarenergy', 0) !== $enabled) {
+        config::save($key, $enabled, 'estarenergy');
+      }
     }
 
+    if ((int) config::byKey('functionality::cron15', 'estarenergy', 0) !== 0) {
+      config::save('functionality::cron15', 0, 'estarenergy');
+    }
+  }
+
+  private static function normalizeRefreshSchedule($value) {
     $value = trim((string) $value);
     if ($value === '') {
       return '';
@@ -226,6 +259,11 @@ class estarenergy extends eqLogic {
     $scheduleAliases = self::getRefreshScheduleAliases();
     if (array_key_exists($value, $scheduleAliases)) {
       $value = $scheduleAliases[$value];
+    }
+
+    $allowedSchedules = array('*/5 * * * *', '*/10 * * * *', '*/30 * * * *', '0 * * * *');
+    if (!in_array($value, $allowedSchedules, true)) {
+      $value = '*/10 * * * *';
     }
 
     return $value;
