@@ -37,33 +37,45 @@ class estarenergy extends eqLogic {
 
   /*
   * Fonction exécutée automatiquement toutes les minutes par Jeedom
-  public static function cron() {}
   */
+  public static function cron() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 5 minutes par Jeedom
-  public static function cron5() {}
   */
+  public static function cron5() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 10 minutes par Jeedom
-  public static function cron10() {}
   */
+  public static function cron10() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 15 minutes par Jeedom
-  public static function cron15() {}
   */
+  public static function cron15() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les 30 minutes par Jeedom
-  public static function cron30() {}
   */
+  public static function cron30() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement toutes les heures par Jeedom
-  public static function cronHourly() {}
   */
+  public static function cronHourly() {
+    self::runScheduledRefresh();
+  }
 
   /*
   * Fonction exécutée automatiquement tous les jours par Jeedom
@@ -79,13 +91,134 @@ class estarenergy extends eqLogic {
   }
   */
 
-  /*
-  * Permet de déclencher une action après modification d'une variable de configuration du plugin
-  * Exemple avec la variable "param3"
-  public static function postConfig_param3($value) {
-    // no return value
+  /**
+   * Applique la planification du cron à partir de la configuration du plugin.
+   */
+  public static function applyRefreshCron($value = null) {
+    if ($value === null) {
+      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+    }
+
+    $legacyValues = array(
+      'cron' => '* * * * *',
+      'cron5' => '*/5 * * * *',
+      'cron10' => '*/10 * * * *',
+      'cron15' => '*/15 * * * *',
+      'cron30' => '*/30 * * * *',
+      'cronHourly' => '0 * * * *',
+    );
+
+    if (array_key_exists($value, $legacyValues)) {
+      $value = $legacyValues[$value];
+    }
+
+    $scheduleAliases = array(
+      '*/60 * * * *' => '0 * * * *',
+    );
+
+    if (array_key_exists($value, $scheduleAliases)) {
+      $value = $scheduleAliases[$value];
+    }
+
+    $functionBySchedule = array(
+      '* * * * *' => 'cron',
+      '*/5 * * * *' => 'cron5',
+      '*/10 * * * *' => 'cron10',
+      '*/15 * * * *' => 'cron15',
+      '*/30 * * * *' => 'cron30',
+      '0 * * * *' => 'cronHourly',
+    );
+
+    $legacyCron = cron::byClassAndFunction(__CLASS__, 'pullData');
+    if (is_object($legacyCron)) {
+      $legacyCron->remove();
+    }
+
+    if (empty($value)) {
+      foreach ($functionBySchedule as $function) {
+        $cron = cron::byClassAndFunction(__CLASS__, $function);
+        if (is_object($cron)) {
+          $cron->remove();
+        }
+      }
+      return;
+    }
+
+    $targetFunction = null;
+    if (array_key_exists($value, $functionBySchedule)) {
+      $targetFunction = $functionBySchedule[$value];
+    }
+
+    if ($targetFunction !== null) {
+      foreach ($functionBySchedule as $function) {
+        if ($function === $targetFunction) {
+          continue;
+        }
+        $cron = cron::byClassAndFunction(__CLASS__, $function);
+        if (is_object($cron)) {
+          $cron->remove();
+        }
+      }
+
+      $cron = cron::byClassAndFunction(__CLASS__, $targetFunction);
+      if (!is_object($cron)) {
+        $cron = new cron();
+        $cron->setClass(__CLASS__);
+        $cron->setFunction($targetFunction);
+      }
+
+      $cron->setSchedule($value);
+      $cron->setEnable(1);
+      $cron->setDeamon(0);
+      $cron->setOnce(0);
+      $cron->save();
+      return;
+    }
+
+    $cron = cron::byClassAndFunction(__CLASS__, 'pullData');
+    if (!is_object($cron)) {
+      $cron = new cron();
+      $cron->setClass(__CLASS__);
+      $cron->setFunction('pullData');
+    }
+
+    $cron->setSchedule($value);
+    $cron->setEnable(1);
+    $cron->setDeamon(0);
+    $cron->setOnce(0);
+    $cron->save();
   }
-  */
+
+  /**
+   * Gestion du cron lors de la modification de la fréquence dans la configuration.
+   */
+  public static function postConfig_estarpower_refresh($value) {
+    self::applyRefreshCron($value);
+  }
+
+  /**
+   * Fonction exécutée par le cron configuré dynamiquement.
+   */
+  public static function pullData() {
+    self::runScheduledRefresh();
+  }
+
+  /**
+   * Rafraîchit tous les équipements gérés par le cron.
+   */
+  private static function runScheduledRefresh() {
+    foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
+      if (!($eqLogic instanceof self)) {
+        continue;
+      }
+
+      try {
+        $eqLogic->refresh();
+      } catch (Exception $e) {
+        log::add('estarenergy', 'error', __("Erreur lors de l'actualisation automatique : ", __FILE__) . $e->getMessage());
+      }
+    }
+  }
 
   /*
    * Permet d'indiquer des éléments supplémentaires à remonter dans les informations de configuration
