@@ -6,7 +6,7 @@ $scriptFileName = basename(__FILE__);
 
 function replacePluginIdInFiles($directory, $newId) {
     global $scriptFileName;
-    $oldId = 'template';
+    $oldId = 'estarenergy';
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
     
     foreach ($files as $file) {
@@ -22,7 +22,7 @@ function replacePluginIdInFiles($directory, $newId) {
 
             $lines = explode(PHP_EOL, $fileContents);
             foreach ($lines as &$line) {
-                if (strpos($line, "include_file('core', 'plugin.template', 'js');") === false) {
+                if (strpos($line, "include_file('core', 'plugin.estarenergy', 'js');") === false) {
                     $line = str_replace($oldId, $newId, $line);
                 }
             }
@@ -35,7 +35,7 @@ function replacePluginIdInFiles($directory, $newId) {
 
 function renameFiles($directory, $newId) {
     global $scriptFileName;
-    $oldId = 'template';
+    $oldId = 'estarenergy';
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
     
     foreach ($files as $file) {
@@ -204,10 +204,10 @@ if (strtolower($confirmation) === 'oui' || strtolower($confirmation) === 'o') {
 
     $dataJson['id'] = $newId; 
 
-    $dataJson['changelog_beta'] = str_replace('template', $newId, $dataJson['changelog_beta']);
-    $dataJson['changelog'] = str_replace('template', $newId, $dataJson['changelog']);
-    $dataJson['documentation_beta'] = str_replace('template', $newId, $dataJson['documentation_beta']);
-    $dataJson['documentation'] = str_replace('template', $newId, $dataJson['documentation']);
+    $dataJson['changelog_beta'] = str_replace('estarenergy', $newId, $dataJson['changelog_beta']);
+    $dataJson['changelog'] = str_replace('estarenergy', $newId, $dataJson['changelog']);
+    $dataJson['documentation_beta'] = str_replace('estarenergy', $newId, $dataJson['documentation_beta']);
+    $dataJson['documentation'] = str_replace('estarenergy', $newId, $dataJson['documentation']);
 
     $directories = [
         __DIR__ . '/../core/class', 
