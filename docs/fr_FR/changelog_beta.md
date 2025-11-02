@@ -1,4 +1,4 @@
-# Changelog plugin template - beta
+# Changelog plugin EstarEnergy - beta
 
 # 19/01/2022
 
