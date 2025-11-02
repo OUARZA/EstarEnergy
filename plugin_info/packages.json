@@ -1,0 +1,23 @@
+{
+  "pre-install": {
+  },
+  "apt": {
+  },
+  "pip3": {
+    "pyserial" : {"reinstall" : true},
+    "requests" : {"reinstall" : true}
+  },
+  "npm": {
+    "plugins/estarenergy/ressources/demond"  : {}
+  },
+  "composer": {
+       "plugins/estarenergy"  : {}
+  },
+  "yarn": {
+    "plugins/estarenergy/ressources/demond"  : {}
+  },
+  "plugin": {
+  },
+  "post-install": {
+  }
+}
