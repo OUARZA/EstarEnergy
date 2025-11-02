@@ -79,11 +79,17 @@ if (!isConnect()) {
     }
 
     function applyCronUpdate() {
+      var schedule = '';
+      var $field = getCronField();
+      if ($field.length) {
+        schedule = ($field.val() || '').trim();
+      }
       $.ajax({
         type: 'POST',
         url: 'plugins/estarenergy/core/ajax/estarenergy.ajax.php',
         data: {
-          action: 'applyCronSchedule'
+          action: 'applyCronSchedule',
+          schedule: schedule
         },
         dataType: 'json',
         error: function (request, status, error) {

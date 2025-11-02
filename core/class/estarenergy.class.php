@@ -20,6 +20,12 @@ require_once __DIR__ . '/../../../../core/php/core.inc.php';
 
 class estarenergy extends eqLogic {
     private const DEFAULT_CRON_SCHEDULE = '*/5 * * * *';
+    private const ALLOWED_CRON_SCHEDULES = [
+        '*/5 * * * *' => true,
+        '*/10 * * * *' => true,
+        '*/30 * * * *' => true,
+        '0 * * * *' => true,
+    ];
     private const LOGIN_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
     private const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
     private const TOKEN_CACHE_KEY = 'estarenergy::auth';
@@ -95,8 +101,8 @@ class estarenergy extends eqLogic {
         }
     }
 
-    public static function synchronizeCronTask(): bool {
-        $schedule = self::getConfiguredSchedule();
+    public static function synchronizeCronTask(?string $preferredSchedule = null): bool {
+        $schedule = self::normalizeCronSchedule($preferredSchedule ?? self::getConfiguredSchedule());
 
         $cron = cron::byClassAndFunction('estarenergy', 'refreshFromCron');
 
@@ -136,9 +142,24 @@ class estarenergy extends eqLogic {
         return true;
     }
 
+    public static function applyCronSchedule(string $schedule): void {
+        $normalizedSchedule = self::normalizeCronSchedule($schedule);
+        config::save('refresh_cron', $normalizedSchedule, 'estarenergy');
+        if (!self::synchronizeCronTask($normalizedSchedule)) {
+            throw new Exception(__('Impossible de mettre à jour la planification, vérifiez l\'expression cron.', __FILE__));
+        }
+    }
+
     private static function getConfiguredSchedule(): string {
         $schedule = trim((string) config::byKey('refresh_cron', 'estarenergy', self::DEFAULT_CRON_SCHEDULE));
-        if ($schedule === '') {
+
+        return self::normalizeCronSchedule($schedule);
+    }
+
+    private static function normalizeCronSchedule(string $schedule): string {
+        $schedule = trim($schedule);
+
+        if ($schedule === '' || !array_key_exists($schedule, self::ALLOWED_CRON_SCHEDULES)) {
             return self::DEFAULT_CRON_SCHEDULE;
         }
 

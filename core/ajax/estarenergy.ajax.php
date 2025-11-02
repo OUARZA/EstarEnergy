@@ -31,9 +31,8 @@ try {
 
     switch (init('action')) {
         case 'applyCronSchedule':
-            if (!estarenergy::synchronizeCronTask()) {
-                throw new Exception(__('Impossible de mettre à jour la planification, vérifiez l\'expression cron.', __FILE__));
-            }
+            $schedule = (string) init('schedule');
+            estarenergy::applyCronSchedule($schedule);
             ajax::success();
             break;
         default:
