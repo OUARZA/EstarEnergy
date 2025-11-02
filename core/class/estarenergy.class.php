@@ -121,6 +121,70 @@ class estarenergy extends eqLogic {
 
   // Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
   public function postSave() {
+    $infoCommands = array(
+      'Pv_power',
+      'Load_power',
+      'Grid_power',
+      'meter_b_in_eq',
+      'meter_b_out_eq',
+      'self_eq',
+      'month_eq',
+      'today_eq',
+      'year_eq',
+      'total_eq',
+      'plant_tree',
+      'co2_emission_reduction',
+    );
+
+    foreach ($infoCommands as $logicalId) {
+      $this->createOrUpdateInfoCommand($logicalId, $logicalId);
+    }
+
+    $this->createOrUpdateActionCommand('refresh', __('Actualiser', __FILE__));
+  }
+
+  /**
+   * Crée ou met à jour une commande info si elle n'existe pas encore.
+   */
+  protected function createOrUpdateInfoCommand($logicalId, $name) {
+    $cmd = $this->getCmd(null, $logicalId);
+    if (!is_object($cmd)) {
+      $cmd = new estarenergyCmd();
+      $cmd->setLogicalId($logicalId);
+      $cmd->setEqLogic_id($this->getId());
+      $cmd->setType('info');
+      $cmd->setSubType('numeric');
+    }
+
+    $cmd->setName(__($name, __FILE__));
+    $cmd->setIsHistorized(1);
+    $cmd->setIsVisible(1);
+    $cmd->save();
+  }
+
+  /**
+   * Crée ou met à jour une commande action si elle n'existe pas encore.
+   */
+  protected function createOrUpdateActionCommand($logicalId, $name) {
+    $cmd = $this->getCmd(null, $logicalId);
+    if (!is_object($cmd)) {
+      $cmd = new estarenergyCmd();
+      $cmd->setLogicalId($logicalId);
+      $cmd->setEqLogic_id($this->getId());
+      $cmd->setType('action');
+      $cmd->setSubType('other');
+    }
+
+    $cmd->setName($name);
+    $cmd->setIsVisible(1);
+    $cmd->save();
+  }
+
+  /**
+   * Déclenche une actualisation manuelle de l'équipement.
+   */
+  public function refresh() {
+    log::add('estarenergy', 'info', __('Actualisation manuelle demandée', __FILE__) . ' : ' . $this->getHumanName());
   }
 
   // Fonction exécutée automatiquement avant la suppression de l'équipement
@@ -171,6 +235,18 @@ class estarenergyCmd extends cmd {
 
   // Exécution d'une commande
   public function execute($_options = array()) {
+    $eqLogic = $this->getEqLogic();
+    if (!is_object($eqLogic)) {
+      throw new Exception(__('Equipement introuvable', __FILE__));
+    }
+
+    switch ($this->getLogicalId()) {
+      case 'refresh':
+        $eqLogic->refresh();
+        return true;
+    }
+
+    return null;
   }
 
   /*     * **********************Getteur Setteur*************************** */
