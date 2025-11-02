@@ -132,8 +132,9 @@ if (!isConnect()) {
 
     ensureDefaultCronValue();
 
-    $('#bt_savePluginConf').off('click.estarenergy').on('click.estarenergy', function () {
-      window.setTimeout(applyCronUpdate, 1000);
+    var saveButtonSelector = '#bt_savePluginConf, #bt_saveConfig';
+    $('body').off('click.estarenergy', saveButtonSelector).on('click.estarenergy', saveButtonSelector, function () {
+      applyCronUpdate();
     });
   })();
 </script>

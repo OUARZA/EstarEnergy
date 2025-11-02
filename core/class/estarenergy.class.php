@@ -62,6 +62,10 @@ class estarenergy extends eqLogic {
         self::refreshAllEquipments();
     }
 
+    public static function postConfig() {
+        self::synchronizeCronTask();
+    }
+
     /*     * *********************Méthodes d'instance************************* */
 
     public function postSave() {
