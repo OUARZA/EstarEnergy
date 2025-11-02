@@ -42,11 +42,15 @@ if (!isConnect()) {
     </div>
     <div class="form-group">
       <label class="col-md-4 control-label">{{Fréquence de mise à jour}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Expression cron utilisée pour planifier l'actualisation des données. Laissez la valeur par défaut pour une mise à jour toutes les 5 minutes.}}"></i></sup>
+        <sup><i class="fas fa-question-circle tooltips" title="{{Intervalle utilisé pour planifier l'actualisation des données.}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="refresh_cron" type="text" placeholder="*/5 * * * *" autocomplete="off" />
-        <p class="help-block">{{Utilisez une expression cron standard (ex. : 0 * * * * pour une mise à jour chaque heure).}}</p>
+        <select class="configKey form-control" data-l1key="refresh_cron">
+          <option value="*/5 * * * *">{{Toutes les 5 minutes}}</option>
+          <option value="*/10 * * * *">{{Toutes les 10 minutes}}</option>
+          <option value="*/30 * * * *">{{Toutes les 30 minutes}}</option>
+          <option value="0 * * * *">{{Toutes les 60 minutes}}</option>
+        </select>
       </div>
     </div>
   </fieldset>
@@ -62,8 +66,14 @@ if (!isConnect()) {
       if (!$field.length) {
         return;
       }
+      var allowedValues = {
+        '*/5 * * * *': true,
+        '*/10 * * * *': true,
+        '*/30 * * * *': true,
+        '0 * * * *': true
+      };
       var current = ($field.val() || '').trim();
-      if (current === '') {
+      if (!allowedValues[current]) {
         $field.val('*/5 * * * *');
       }
     }
