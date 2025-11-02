@@ -15,3 +15,11 @@ Cette page présente les informations générales du plugin. Pour des guides dé
 * [Documentation du plugin](https://doc.jeedom.com/fr_FR/dev/documentation_plugin) : Conseils pour maintenir une documentation complète du plugin.
 
 * [Publication du plugin](https://doc.jeedom.com/fr_FR/dev/publication_plugin) : Prérequis pour la publication du plugin EstarEnergy.
+
+## Renseigner l'identifiant de la centrale
+
+Chaque équipement doit être rattaché à une centrale Estar. L'identifiant est visible dans l'URL du portail de supervision après `detail-id=` comme illustré ci-dessous.
+
+![URL du portail Estar mettant en avant le paramètre detail-id](images/monitor_station_id.png)
+
+Reportez la valeur mise en évidence dans le champ **ID de la centrale** de la fiche équipement du plugin.
