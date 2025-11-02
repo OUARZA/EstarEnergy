@@ -16,15 +16,22 @@
 */
 
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
+require_once dirname(__FILE__) . '/../core/class/estarenergy.class.php';
 
 // Fonction exécutée automatiquement après l'installation du plugin
 function estarenergy_install() {
+  estarenergy::applyRefreshCron();
 }
 
 // Fonction exécutée automatiquement après la mise à jour du plugin
 function estarenergy_update() {
+  estarenergy::applyRefreshCron();
 }
 
 // Fonction exécutée automatiquement après la suppression du plugin
 function estarenergy_remove() {
+  $cron = cron::byClassAndFunction('estarenergy', 'pullData');
+  if (is_object($cron)) {
+    $cron->remove();
+  }
 }

@@ -79,13 +79,72 @@ class estarenergy extends eqLogic {
   }
   */
 
-  /*
-  * Permet de déclencher une action après modification d'une variable de configuration du plugin
-  * Exemple avec la variable "param3"
-  public static function postConfig_param3($value) {
-    // no return value
+  /**
+   * Applique la planification du cron à partir de la configuration du plugin.
+   */
+  public static function applyRefreshCron($value = null) {
+    if ($value === null) {
+      $value = config::byKey('estarpower_refresh', 'estarenergy', '*/5 * * * *');
+    }
+
+    $legacyValues = array(
+      'cron' => '* * * * *',
+      'cron5' => '*/5 * * * *',
+      'cron10' => '*/10 * * * *',
+      'cron15' => '*/15 * * * *',
+      'cron30' => '*/30 * * * *',
+      'cronHourly' => '0 * * * *',
+    );
+
+    if (array_key_exists($value, $legacyValues)) {
+      $value = $legacyValues[$value];
+    }
+
+    $cron = cron::byClassAndFunction(__CLASS__, 'pullData');
+
+    if (empty($value)) {
+      if (is_object($cron)) {
+        $cron->remove();
+      }
+      return;
+    }
+
+    if (!is_object($cron)) {
+      $cron = new cron();
+      $cron->setClass(__CLASS__);
+      $cron->setFunction('pullData');
+    }
+
+    $cron->setSchedule($value);
+    $cron->setEnable(1);
+    $cron->setDeamon(0);
+    $cron->setOnce(0);
+    $cron->save();
   }
-  */
+
+  /**
+   * Gestion du cron lors de la modification de la fréquence dans la configuration.
+   */
+  public static function postConfig_estarpower_refresh($value) {
+    self::applyRefreshCron($value);
+  }
+
+  /**
+   * Fonction exécutée par le cron configuré dynamiquement.
+   */
+  public static function pullData() {
+    foreach (eqLogic::byType('estarenergy', true) as $eqLogic) {
+      if (!($eqLogic instanceof self)) {
+        continue;
+      }
+
+      try {
+        $eqLogic->refresh();
+      } catch (Exception $e) {
+        log::add('estarenergy', 'error', __("Erreur lors de l'actualisation automatique : ", __FILE__) . $e->getMessage());
+      }
+    }
+  }
 
   /*
    * Permet d'indiquer des éléments supplémentaires à remonter dans les informations de configuration
