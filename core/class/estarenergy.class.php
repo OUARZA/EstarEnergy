@@ -332,6 +332,8 @@ class estarenergy extends eqLogic {
       touch($cookieFile);
     }
 
+    log::add('estarenergy', 'debug', sprintf(__('Fichier de cookies utilisé : %s', __FILE__), $cookieFile));
+
     if ($token === null) {
       log::add('estarenergy', 'debug', __('Aucun jeton valide en cache, tentative de connexion à l’API Estar Power', __FILE__));
       $token = $this->retrieveToken($login, $password, $cookieFile);
@@ -379,11 +381,15 @@ class estarenergy extends eqLogic {
     ));
 
     log::add('estarenergy', 'debug', sprintf(__('Requête de données pour la centrale %s, charge utile : %s', __FILE__), $stationId, $this->sanitizePayloadForLog($payload)));
+    if ($this->shouldRevealSensitiveLogs()) {
+      log::add('estarenergy', 'debug', sprintf(__('Charge utile envoyée (détaillée) : %s', __FILE__), $payload));
+    }
     $response = $this->sendCurlRequest(self::DATA_URL, $headers, $payload, $cookieFile);
     if ($response === null) {
       return null;
     }
 
+    log::add('estarenergy', 'debug', sprintf(__('Réponse brute (données) : %s', __FILE__), $response));
     $decoded = json_decode($response, true);
     if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
       log::add('estarenergy', 'error', 'Réponse JSON invalide lors de la récupération des données : ' . json_last_error_msg());
@@ -436,21 +442,20 @@ class estarenergy extends eqLogic {
       return '';
     }
 
-    $trimmedValue = trim($rawValue);
-    if ($trimmedValue === '') {
+    if ($rawValue === '') {
       return '';
     }
 
     try {
       $decrypted = utils::decrypt($rawValue);
-      if (is_string($decrypted) && trim($decrypted) !== '') {
-        return trim($decrypted);
+      if (is_string($decrypted) && $decrypted !== '') {
+        return $decrypted;
       }
     } catch (Exception $e) {
       log::add('estarenergy', 'debug', sprintf(__('Impossible de déchiffrer le mot de passe Estar Power : %s', __FILE__), $e->getMessage()));
     }
 
-    return $trimmedValue;
+    return $rawValue;
   }
 
   protected function retrieveToken($login, $password, $cookieFile, $forceRefresh = false) {
@@ -491,12 +496,16 @@ class estarenergy extends eqLogic {
     $sanitizedBody = $requestBody;
     $sanitizedBody['body']['password'] = $this->maskSensitiveValue($sanitizedBody['body']['password']);
     log::add('estarenergy', 'debug', sprintf(__('Charge utile d’authentification (masquée) : %s', __FILE__), $this->encodeForLog($sanitizedBody)));
+    if ($this->shouldRevealSensitiveLogs()) {
+      log::add('estarenergy', 'debug', sprintf(__('Charge utile d’authentification (détaillée) : %s', __FILE__), $data));
+    }
 
     $response = $this->sendCurlRequest(self::AUTH_URL, $headers, $data, $cookieFile, true);
     if ($response === null) {
       return null;
     }
 
+    log::add('estarenergy', 'debug', sprintf(__('Réponse brute (login) : %s', __FILE__), $response));
     $decoded = json_decode($response, true);
     if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
       log::add('estarenergy', 'error', sprintf(__('Erreur de décodage JSON lors de l’authentification : %s', __FILE__), json_last_error_msg()));
@@ -540,6 +549,7 @@ class estarenergy extends eqLogic {
 
     if ($storeCookies) {
       curl_setopt($curl, CURLOPT_COOKIEJAR, $cookieFile);
+      curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
     } else {
       curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
     }
@@ -548,6 +558,9 @@ class estarenergy extends eqLogic {
     log::add('estarenergy', 'debug', sprintf(__('En-têtes envoyées : %s', __FILE__), $this->encodeForLog($this->sanitizeHeadersForLog($headers))));
     if (is_string($payload) && $payload !== '') {
       log::add('estarenergy', 'debug', sprintf(__('Charge utile envoyée : %s', __FILE__), $this->sanitizePayloadForLog($payload)));
+      if ($this->shouldRevealSensitiveLogs()) {
+        log::add('estarenergy', 'debug', sprintf(__('Charge utile envoyée (détaillée) : %s', __FILE__), $payload));
+      }
     }
 
     $response = curl_exec($curl);
@@ -610,11 +623,15 @@ class estarenergy extends eqLogic {
   }
 
   protected function getTokenFilePath() {
-    return $this->getStorageDirectory() . '/auth_token.json';
+    $file = $this->getStorageDirectory() . '/auth_token.json';
+    log::add('estarenergy', 'debug', sprintf(__('Fichier de cache du jeton utilisé : %s', __FILE__), $file));
+    return $file;
   }
 
   protected function getCookieFilePath() {
-    return $this->getStorageDirectory() . '/cookies.txt';
+    $file = $this->getStorageDirectory() . '/cookies.txt';
+    log::add('estarenergy', 'debug', sprintf(__('Chemin du fichier de cookies : %s', __FILE__), $file));
+    return $file;
   }
 
   protected function getStorageDirectory() {
@@ -690,6 +707,10 @@ class estarenergy extends eqLogic {
       return $value;
     }
 
+    if ($this->shouldRevealSensitiveLogs()) {
+      return $value;
+    }
+
     $length = strlen($value);
     if ($length <= ($visible * 2)) {
       return str_repeat('*', $length);
@@ -729,6 +750,10 @@ class estarenergy extends eqLogic {
       return $payload;
     }
 
+    if ($this->shouldRevealSensitiveLogs()) {
+      return $payload;
+    }
+
     $decoded = json_decode($payload, true);
     if (!is_array($decoded)) {
       return $payload;
@@ -743,6 +768,10 @@ class estarenergy extends eqLogic {
     }
 
     return $this->encodeForLog($decoded);
+  }
+
+  protected function shouldRevealSensitiveLogs() {
+    return config::byKey('estarpower_debug_full_logs', 'estarenergy', '1') === '1';
   }
 
   protected function handleDailyLoginFailureLimit($apiMessage) {
