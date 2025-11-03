@@ -394,6 +394,43 @@ class estarenergy extends eqLogic {
     return $decoded;
   }
 
+  protected function reportAuthenticationFailure($response) {
+    if (!is_array($response)) {
+      return;
+    }
+
+    $message = '';
+    if (isset($response['message']) && is_string($response['message'])) {
+      $message = trim($response['message']);
+    }
+
+    $status = isset($response['status']) ? trim((string) $response['status']) : '';
+    $formatted = $this->translateAuthenticationMessage($message, $status);
+    if ($formatted === null) {
+      return;
+    }
+
+    log::add('estarenergy', 'error', $formatted);
+    message::add('estarenergy', $formatted);
+  }
+
+  protected function translateAuthenticationMessage($message, $status) {
+    if ($message !== '') {
+      $normalized = $message;
+      if ($normalized === '登录失败' || $normalized === '登陆失败') {
+        return __('Connexion refusée par Estar Power : identifiants invalides (message distant 登录失败).', __FILE__);
+      }
+
+      return sprintf(__('Erreur d’authentification Estar Power signalée : %s', __FILE__), $normalized);
+    }
+
+    if ($status !== '') {
+      return sprintf(__('Erreur d’authentification Estar Power (statut %s)', __FILE__), $status);
+    }
+
+    return null;
+  }
+
   protected function resolveConfigPassword($rawValue) {
     if (!is_string($rawValue)) {
       return '';
@@ -479,6 +516,7 @@ class estarenergy extends eqLogic {
     }
 
     if (!is_array($decoded) || !isset($decoded['data']['token'])) {
+      $this->reportAuthenticationFailure($decoded);
       log::add('estarenergy', 'error', __('Impossible d’extraire le token d’authentification', __FILE__));
       log::add('estarenergy', 'debug', sprintf(__('Réponse reçue lors de la récupération du token : %s', __FILE__), $response));
       return null;
