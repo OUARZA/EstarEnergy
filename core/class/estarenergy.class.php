@@ -141,6 +141,11 @@ class estarenergy extends eqLogic {
   }
   */
 
+  public static function postConfig_estarpower_refresh($value) {
+    self::synchronizeRefreshCrons($value);
+    return $value;
+  }
+
   /*
    * Permet d'indiquer des éléments supplémentaires à remonter dans les informations de configuration
    * lors de la création semi-automatique d'un post sur le forum community
