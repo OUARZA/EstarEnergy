@@ -318,6 +318,9 @@ class estarenergy extends eqLogic {
   /*     * **********************Getteur Setteur*************************** */
 
   /**
+   * Récupère les données de la centrale, en réutilisant la logique
+   * de ton bloc scénario (lecture token → login → appel API → relogin si code != 200).
+   *
    * @param string $login
    * @param string $password
    * @param string $stationId
@@ -325,36 +328,50 @@ class estarenergy extends eqLogic {
    * @throws Exception
    */
   protected function fetchStationData($login, $password, $stationId) {
-    $token = $this->readSavedToken();
     $cookieFile = $this->getCookieFilePath();
 
+    // On s'assure que le fichier de cookies existe
     if (!file_exists($cookieFile)) {
       touch($cookieFile);
     }
 
+    // 1. Lecture du token déjà sauvegardé (équivalent à read_saved_token)
+    $token = $this->readSavedToken();
     if ($token === null) {
-      log::add('estarenergy', 'debug', __('Aucun jeton valide en cache, tentative de connexion à l’API Estar Power', __FILE__));
+      log::add('estarenergy', 'debug', __('Aucun token valide trouvé. Connexion en cours...', __FILE__));
+      // Équivalent à get_token($scenario, $username, $password, $token_file, $cookie_file)
       $token = $this->retrieveToken($login, $password, $cookieFile);
     }
 
     if ($token === null) {
-      throw new Exception(__('Impossible de récupérer un jeton d’authentification', __FILE__));
+      // Équivalent à "Erreur critique : Aucun token disponible, arrêt du traitement."
+      throw new Exception(__('Erreur critique : Aucun token Estar Power disponible', __FILE__));
     }
 
+    // 2. Récupération des données (équivalent à get_data + json_decode)
     $payload = $this->queryStationData($token, $cookieFile, $stationId);
+    log::add('estarenergy', 'debug', 'Données brutes Estar Power : ' . print_r($payload, true));
 
+    // Si pas de payload ou code != 200, on re-tente une connexion comme dans ton bloc
     if (!is_array($payload) || (isset($payload['code']) && (int) $payload['code'] !== 200)) {
+      log::add('estarenergy', 'debug', __('Token peut-être expiré ou invalide. Nouvelle tentative de connexion...', __FILE__));
+
       $token = $this->retrieveToken($login, $password, $cookieFile, true);
       if ($token === null) {
-        throw new Exception(__('Token invalide et échec de reconnexion', __FILE__));
+        // Équivalent à "Erreur : Reconnexion impossible. Données non récupérées."
+        throw new Exception(__('Erreur : Reconnexion Estar Power impossible. Données non récupérées.', __FILE__));
       }
 
       $payload = $this->queryStationData($token, $cookieFile, $stationId);
+      log::add('estarenergy', 'debug', 'Données brutes Estar Power (après reconnexion) : ' . print_r($payload, true));
+
       if (!is_array($payload) || (isset($payload['code']) && (int) $payload['code'] !== 200)) {
-        throw new Exception(__('Données indisponibles après reconnexion à l’API', __FILE__));
+        // Équivalent à "Erreur : Données toujours indisponibles après reconnexion."
+        throw new Exception(__('Erreur : Données Estar Power toujours indisponibles après reconnexion.', __FILE__));
       }
     }
 
+    // Dans l’API Estar, les vraies données sont dans "data"
     return isset($payload['data']) && is_array($payload['data']) ? $payload['data'] : $payload;
   }
 
