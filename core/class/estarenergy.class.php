@@ -391,7 +391,7 @@ class estarenergy extends eqLogic {
         'date' => date('Y-m-d'),
       ),
       'WAITING_PROMISE' => true,
-    ));
+    )));
 
     $response = $this->sendCurlRequest(self::DATA_URL, $headers, $payload, $cookieFile);
     if ($response === null) {
@@ -404,6 +404,23 @@ class estarenergy extends eqLogic {
     }
 
     return $decoded;
+  }
+
+  /**
+   * Encode le mot de passe comme le site Estar :
+   * md5(password) + '.' + base64(sha256(password))
+   */
+  protected function encodeEstarPassword($password) {
+    $password = (string) $password;
+
+    if ($password === '') {
+      return '';
+    }
+
+    $md5hex = md5($password);
+    $sha256_b64 = base64_encode(hash('sha256', $password, true));
+
+    return $md5hex . '.' . $sha256_b64;
   }
 
   protected function retrieveToken($login, $password, $cookieFile, $forceRefresh = false) {
@@ -424,12 +441,15 @@ class estarenergy extends eqLogic {
       'User-Agent: Mozilla/5.0',
     );
 
+    // Encodage du mot de passe selon le format observé côté client
+    $encodedPassword = $this->encodeEstarPassword($password);
+
     $data = json_encode(array(
       'ERROR_BACK' => true,
       'LOAD' => array('loading' => true),
       'body' => array(
         'user_name' => $login,
-        'password' => $password,
+        'password' => $encodedPassword,
       ),
       'WAITING_PROMISE' => true,
     ));
@@ -615,6 +635,7 @@ class estarenergyCmd extends cmd {
   */
 
   /*     * ***********************Methode static*************************** */
+
 
 
   /*     * *********************Methode d'instance************************* */
