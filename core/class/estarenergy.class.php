@@ -181,22 +181,22 @@ class estarenergy extends eqLogic {
   // Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
   public function postSave() {
     $infoCommands = array(
-      'Pv_power',
-      'Load_power',
-      'Grid_power',
-      'meter_b_in_eq',
-      'meter_b_out_eq',
-      'self_eq',
-      'month_eq',
-      'today_eq',
-      'year_eq',
-      'total_eq',
-      'plant_tree',
-      'co2_emission_reduction',
+      'Pv_power' => array('name' => 'Puissance photovoltaïque (Pv_power)', 'unit' => 'W'),
+      'Load_power' => array('name' => 'Consommation habitation (Load_power)', 'unit' => 'W'),
+      'Grid_power' => array('name' => 'Puisage réseau (Grid_power)', 'unit' => 'W'),
+      'meter_b_in_eq' => array('name' => 'Énergie importée du réseau (meter_b_in_eq)', 'unit' => 'Wh'),
+      'meter_b_out_eq' => array('name' => 'Énergie injectée vers le réseau (meter_b_out_eq)', 'unit' => 'Wh'),
+      'self_eq' => array('name' => 'Autoconsommation (self_eq)', 'unit' => 'Wh'),
+      'month_eq' => array('name' => 'Production mensuelle (month_eq)', 'unit' => 'Wh'),
+      'today_eq' => array('name' => 'Production du jour (today_eq)', 'unit' => 'Wh'),
+      'year_eq' => array('name' => 'Production annuelle (year_eq)', 'unit' => 'Wh'),
+      'total_eq' => array('name' => 'Production totale (total_eq)', 'unit' => 'Wh'),
+      'plant_tree' => array('name' => 'Compensation carbone (plant_tree)', 'unit' => __('arbres', __FILE__)),
+      'co2_emission_reduction' => array('name' => 'Réduction des émissions de CO₂ (co2_emission_reduction)', 'unit' => 'kg'),
     );
 
-    foreach ($infoCommands as $logicalId) {
-      $this->createOrUpdateInfoCommand($logicalId, $logicalId);
+    foreach ($infoCommands as $logicalId => $properties) {
+      $this->createOrUpdateInfoCommand($logicalId, $properties['name'], $properties['unit']);
     }
 
     $this->createOrUpdateActionCommand('refresh', __('Actualiser', __FILE__));
@@ -205,7 +205,7 @@ class estarenergy extends eqLogic {
   /**
    * Crée ou met à jour une commande info si elle n'existe pas encore.
    */
-  protected function createOrUpdateInfoCommand($logicalId, $name) {
+  protected function createOrUpdateInfoCommand($logicalId, $name, $unit = '') {
     $cmd = $this->getCmd(null, $logicalId);
     if (!is_object($cmd)) {
       $cmd = new estarenergyCmd();
@@ -216,6 +216,7 @@ class estarenergy extends eqLogic {
     }
 
     $cmd->setName(__($name, __FILE__));
+    $cmd->setUnite(is_string($unit) ? trim($unit) : '');
     $cmd->setIsHistorized(1);
     $cmd->setIsVisible(1);
     $cmd->save();
