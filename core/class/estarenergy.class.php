@@ -260,7 +260,7 @@ class estarenergy extends eqLogic {
     }
 
     $login = trim((string) config::byKey('estarpower_login', 'estarenergy'));
-    $password = (string) config::byKey('estarpower_password', 'estarenergy');
+    $password = $this->resolveConfigPassword(config::byKey('estarpower_password', 'estarenergy'));
 
     if ($login === '' || $password === '') {
       $message = sprintf(
@@ -386,6 +386,28 @@ class estarenergy extends eqLogic {
     }
 
     return $decoded;
+  }
+
+  protected function resolveConfigPassword($rawValue) {
+    if (!is_string($rawValue)) {
+      return '';
+    }
+
+    $trimmedValue = trim($rawValue);
+    if ($trimmedValue === '') {
+      return '';
+    }
+
+    try {
+      $decrypted = utils::decrypt($rawValue);
+      if (is_string($decrypted) && trim($decrypted) !== '') {
+        return trim($decrypted);
+      }
+    } catch (Exception $e) {
+      log::add('estarenergy', 'debug', sprintf(__('Impossible de déchiffrer le mot de passe Estar Power : %s', __FILE__), $e->getMessage()));
+    }
+
+    return $trimmedValue;
   }
 
   protected function retrieveToken($login, $password, $cookieFile, $forceRefresh = false) {
