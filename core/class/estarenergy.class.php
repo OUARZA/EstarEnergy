@@ -191,6 +191,14 @@ class estarenergy extends eqLogic {
       'today_eq' => array('name' => 'Production du jour', 'unit' => 'Wh'),
       'year_eq' => array('name' => 'Production annuelle', 'unit' => 'Wh'),
       'total_eq' => array('name' => 'Production totale', 'unit' => 'Wh'),
+      'daily_purchase_cost' => array('name' => 'Coût d\'achat quotidien', 'unit' => '€', 'isHistorized' => 0),
+      'daily_sale_revenue' => array('name' => 'Revenu de vente quotidien', 'unit' => '€', 'isHistorized' => 0),
+      'annual_revenue' => array('name' => 'Revenu annuel estimé', 'unit' => '€'),
+      'total_revenue' => array('name' => 'Revenu total estimé', 'unit' => '€'),
+      'production_kwh' => array('name' => 'Production', 'unit' => 'kWh'),
+      'consumption_kwh' => array('name' => 'Consommation', 'unit' => 'kWh'),
+      'auto_production_kwh' => array('name' => 'AutoProduction', 'unit' => 'kWh'),
+      'auto_consumption_ratio' => array('name' => 'AutoConsommation', 'unit' => '%', 'isHistorized' => 0),
       'plant_tree' => array('name' => 'Compensation carbone', 'unit' => __('arbres', __FILE__)),
       'co2_emission_reduction' => array('name' => 'Réduction des émissions de CO₂', 'unit' => 'kg'),
       'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
@@ -535,6 +543,7 @@ class estarenergy extends eqLogic {
     $this->updateInfoIfPresent($data, 'co2_emission_reduction', 'co2_emission_reduction', __('Réduction CO2 : %s', __FILE__));
     $this->updateInfoIfPresent($data, 'plant_tree', 'plant_tree', __('Compensation carbone : %s arbres', __FILE__));
 
+    $reflux = array();
     if (isset($data['reflux_station_data']) && is_array($data['reflux_station_data'])) {
       $reflux = $data['reflux_station_data'];
       $this->updateInfoIfPresent($reflux, 'pv_power', 'Pv_power', __('Production panneau : %s W', __FILE__));
@@ -544,6 +553,9 @@ class estarenergy extends eqLogic {
       $this->updateInfoIfPresent($reflux, 'meter_b_out_eq', 'meter_b_out_eq', __('Vers le réseau : %s Wh', __FILE__));
       $this->updateInfoIfPresent($reflux, 'self_eq', 'self_eq', __('Autoconsommation : %s Wh', __FILE__));
     }
+
+    $this->updateEnergyCalculations($data, $reflux);
+    $this->updateRevenueCalculations($data, $reflux);
 
     $this->updateLastRefreshCommand();
   }
@@ -571,6 +583,104 @@ class estarenergy extends eqLogic {
     }
 
     $cmd->event(date('Y-m-d H:i:s'));
+  }
+
+  protected function updateEnergyCalculations(array $data, array $reflux) {
+    $todayProductionWh = $this->getNumericFromArray($data, 'today_eq');
+    $importedWh = $this->getNumericFromArray($reflux, 'meter_b_in_eq');
+    $selfConsumptionWh = $this->getNumericFromArray($reflux, 'self_eq');
+
+    if ($todayProductionWh !== null) {
+      $this->eventNumericCommand('production_kwh', $todayProductionWh / 1000.0);
+    }
+
+    if ($importedWh !== null) {
+      $this->eventNumericCommand('consumption_kwh', $importedWh / 1000.0);
+    }
+
+    if ($selfConsumptionWh !== null) {
+      $this->eventNumericCommand('auto_production_kwh', $selfConsumptionWh / 1000.0);
+    }
+
+    if ($todayProductionWh !== null && $selfConsumptionWh !== null) {
+      $ratio = $todayProductionWh > 0 ? ($selfConsumptionWh / $todayProductionWh) * 100.0 : 0.0;
+      $this->eventNumericCommand('auto_consumption_ratio', $ratio, 2);
+    } elseif ($todayProductionWh !== null) {
+      $this->eventNumericCommand('auto_consumption_ratio', 0.0, 2);
+    }
+  }
+
+  protected function updateRevenueCalculations(array $data, array $reflux) {
+    $purchasePrice = (float) config::byKey('estarpower_purchase_price_ht', 'estarenergy', 0.0);
+    $salePrice = (float) config::byKey('estarpower_sale_price_ht', 'estarenergy', 0.0);
+
+    $importedWh = $this->getNumericFromArray($reflux, 'meter_b_in_eq');
+    $exportedWh = $this->getNumericFromArray($reflux, 'meter_b_out_eq');
+    $annualProductionWh = $this->getNumericFromArray($data, 'year_eq');
+    $totalProductionWh = $this->getNumericFromArray($data, 'total_eq');
+
+    if ($importedWh !== null) {
+      $dailyCost = ($importedWh / 1000.0) * $purchasePrice;
+      $this->eventNumericCommand('daily_purchase_cost', $dailyCost, 4);
+    }
+
+    if ($exportedWh !== null) {
+      $dailyIncome = ($exportedWh / 1000.0) * $salePrice;
+      $this->eventNumericCommand('daily_sale_revenue', $dailyIncome, 4);
+    }
+
+    $priceSpread = $salePrice - $purchasePrice;
+    if ($annualProductionWh !== null) {
+      $annualRevenue = ($annualProductionWh / 1000.0) * $priceSpread;
+      $this->eventNumericCommand('annual_revenue', $annualRevenue, 2);
+    }
+
+    if ($totalProductionWh !== null) {
+      $totalRevenue = ($totalProductionWh / 1000.0) * $priceSpread;
+      $this->eventNumericCommand('total_revenue', $totalRevenue, 2);
+    }
+  }
+
+  protected function getNumericFromArray(array $source, $key) {
+    if (!array_key_exists($key, $source)) {
+      return null;
+    }
+
+    $value = $source[$key];
+    if (is_numeric($value)) {
+      return (float) $value;
+    }
+
+    if (is_string($value)) {
+      $normalized = str_replace(',', '.', trim($value));
+      if ($normalized === '') {
+        return null;
+      }
+
+      if (is_numeric($normalized)) {
+        return (float) $normalized;
+      }
+    }
+
+    return null;
+  }
+
+  protected function eventNumericCommand($logicalId, $value, $precision = 3) {
+    $cmd = $this->getCmd(null, $logicalId);
+    if (!is_object($cmd)) {
+      return;
+    }
+
+    if ($value === null) {
+      return;
+    }
+
+    if (is_numeric($value)) {
+      $cmd->event(round((float) $value, $precision));
+      return;
+    }
+
+    $cmd->event($value);
   }
 
   protected function getTokenFilePath() {
