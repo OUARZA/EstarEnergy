@@ -203,7 +203,8 @@ class estarenergy extends eqLogic {
   }
 
   /**
-   * Crée ou met à jour une commande info si elle n'existe pas encore.
+   * Crée une commande info si elle n'existe pas encore.
+   * Ne modifie pas nom / unité / historisation / visibilité si la commande existe déjà.
    */
   protected function createOrUpdateInfoCommand($logicalId, $name, $unit = '') {
     $cmd = $this->getCmd(null, $logicalId);
@@ -213,13 +214,12 @@ class estarenergy extends eqLogic {
       $cmd->setEqLogic_id($this->getId());
       $cmd->setType('info');
       $cmd->setSubType('numeric');
+      $cmd->setName(__($name, __FILE__));
+      $cmd->setUnite(is_string($unit) ? trim($unit) : '');
+      $cmd->setIsHistorized(1);
+      $cmd->setIsVisible(1);
+      $cmd->save();
     }
-
-    $cmd->setName(__($name, __FILE__));
-    $cmd->setUnite(is_string($unit) ? trim($unit) : '');
-    $cmd->setIsHistorized(1);
-    $cmd->setIsVisible(1);
-    $cmd->save();
   }
 
   /**
@@ -341,7 +341,7 @@ class estarenergy extends eqLogic {
     if ($token === null) {
       log::add('estarenergy', 'debug', __('Aucun token valide trouvé. Connexion en cours...', __FILE__));
       // Équivalent à get_token($scenario, $username, $password, $token_file, $cookie_file)
-      $token = $this->retrieveToken($login, $password, $cookieFile);
+      $token = $this->.retrieveToken($login, $password, $cookieFile);
     }
 
     if ($token === null) {
