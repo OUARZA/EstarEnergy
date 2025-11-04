@@ -181,45 +181,56 @@ class estarenergy extends eqLogic {
   // Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
   public function postSave() {
     $infoCommands = array(
-      'Pv_power' => array('name' => 'Puissance photovoltaïque (Pv_power)', 'unit' => 'W'),
-      'Load_power' => array('name' => 'Consommation habitation (Load_power)', 'unit' => 'W'),
-      'Grid_power' => array('name' => 'Puisage réseau (Grid_power)', 'unit' => 'W'),
-      'meter_b_in_eq' => array('name' => 'Énergie importée du réseau (meter_b_in_eq)', 'unit' => 'Wh'),
-      'meter_b_out_eq' => array('name' => 'Énergie injectée vers le réseau (meter_b_out_eq)', 'unit' => 'Wh'),
-      'self_eq' => array('name' => 'Autoconsommation (self_eq)', 'unit' => 'Wh'),
-      'month_eq' => array('name' => 'Production mensuelle (month_eq)', 'unit' => 'Wh'),
-      'today_eq' => array('name' => 'Production du jour (today_eq)', 'unit' => 'Wh'),
-      'year_eq' => array('name' => 'Production annuelle (year_eq)', 'unit' => 'Wh'),
-      'total_eq' => array('name' => 'Production totale (total_eq)', 'unit' => 'Wh'),
-      'plant_tree' => array('name' => 'Compensation carbone (plant_tree)', 'unit' => __('arbres', __FILE__)),
-      'co2_emission_reduction' => array('name' => 'Réduction des émissions de CO₂ (co2_emission_reduction)', 'unit' => 'kg'),
+      'Pv_power' => array('name' => 'Puissance photovoltaïque', 'unit' => 'W'),
+      'Load_power' => array('name' => 'Consommation habitation', 'unit' => 'W'),
+      'Grid_power' => array('name' => 'Puisage réseau', 'unit' => 'W'),
+      'meter_b_in_eq' => array('name' => 'Énergie importée du réseau', 'unit' => 'Wh'),
+      'meter_b_out_eq' => array('name' => 'Énergie injectée vers le réseau', 'unit' => 'Wh'),
+      'self_eq' => array('name' => 'Autoconsommation', 'unit' => 'Wh'),
+      'month_eq' => array('name' => 'Production mensuelle', 'unit' => 'Wh'),
+      'today_eq' => array('name' => 'Production du jour', 'unit' => 'Wh'),
+      'year_eq' => array('name' => 'Production annuelle', 'unit' => 'Wh'),
+      'total_eq' => array('name' => 'Production totale', 'unit' => 'Wh'),
+      'plant_tree' => array('name' => 'Compensation carbone', 'unit' => __('arbres', __FILE__)),
+      'co2_emission_reduction' => array('name' => 'Réduction des émissions de CO₂', 'unit' => 'kg'),
+      'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
     );
 
     foreach ($infoCommands as $logicalId => $properties) {
-      $this->createOrUpdateInfoCommand($logicalId, $properties['name'], $properties['unit']);
+      $subType = isset($properties['subType']) ? $properties['subType'] : 'numeric';
+      $isHistorized = array_key_exists('isHistorized', $properties) ? (int) $properties['isHistorized'] : 1;
+      $isVisible = array_key_exists('isVisible', $properties) ? (int) $properties['isVisible'] : 1;
+      $this->createOrUpdateInfoCommand(
+        $logicalId,
+        $properties['name'],
+        $properties['unit'],
+        $subType,
+        $isHistorized,
+        $isVisible
+      );
     }
 
-    $this->createOrUpdateActionCommand('refresh', __('Actualiser', __FILE__));
+    $this->createOrUpdateActionCommand('refresh', 'Actualiser');
   }
 
   /**
-   * Crée une commande info si elle n'existe pas encore.
-   * Ne modifie pas nom / unité / historisation / visibilité si la commande existe déjà.
+   * Crée ou met à jour une commande info avec les propriétés attendues.
    */
-  protected function createOrUpdateInfoCommand($logicalId, $name, $unit = '') {
+  protected function createOrUpdateInfoCommand($logicalId, $name, $unit = '', $subType = 'numeric', $isHistorized = 1, $isVisible = 1) {
     $cmd = $this->getCmd(null, $logicalId);
     if (!is_object($cmd)) {
       $cmd = new estarenergyCmd();
       $cmd->setLogicalId($logicalId);
       $cmd->setEqLogic_id($this->getId());
-      $cmd->setType('info');
-      $cmd->setSubType('numeric');
-      $cmd->setName(__($name, __FILE__));
-      $cmd->setUnite(is_string($unit) ? trim($unit) : '');
-      $cmd->setIsHistorized(1);
-      $cmd->setIsVisible(1);
-      $cmd->save();
     }
+
+    $cmd->setType('info');
+    $cmd->setSubType($subType);
+    $cmd->setName(__($name, __FILE__));
+    $cmd->setUnite(is_string($unit) ? trim($unit) : '');
+    $cmd->setIsHistorized((int) $isHistorized);
+    $cmd->setIsVisible((int) $isVisible);
+    $cmd->save();
   }
 
   /**
@@ -235,7 +246,7 @@ class estarenergy extends eqLogic {
       $cmd->setSubType('other');
     }
 
-    $cmd->setName($name);
+    $cmd->setName(__($name, __FILE__));
     $cmd->setIsVisible(1);
     $cmd->save();
   }
@@ -533,6 +544,8 @@ class estarenergy extends eqLogic {
       $this->updateInfoIfPresent($reflux, 'meter_b_out_eq', 'meter_b_out_eq', __('Vers le réseau : %s Wh', __FILE__));
       $this->updateInfoIfPresent($reflux, 'self_eq', 'self_eq', __('Autoconsommation : %s Wh', __FILE__));
     }
+
+    $this->updateLastRefreshCommand();
   }
 
   protected function updateInfoIfPresent(array $source, $sourceKey, $logicalId, $logMessage = null) {
@@ -549,6 +562,15 @@ class estarenergy extends eqLogic {
     if ($logMessage !== null) {
       log::add('estarenergy', 'debug', sprintf($logMessage, $value));
     }
+  }
+
+  protected function updateLastRefreshCommand() {
+    $cmd = $this->getCmd(null, 'last_refresh');
+    if (!is_object($cmd)) {
+      return;
+    }
+
+    $cmd->event(date('Y-m-d H:i:s'));
   }
 
   protected function getTokenFilePath() {
