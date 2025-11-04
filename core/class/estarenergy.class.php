@@ -391,7 +391,7 @@ class estarenergy extends eqLogic {
         'date' => date('Y-m-d'),
       ),
       'WAITING_PROMISE' => true,
-    )));
+    ));
 
     $response = $this->sendCurlRequest(self::DATA_URL, $headers, $payload, $cookieFile);
     if ($response === null) {
