@@ -341,7 +341,7 @@ class estarenergy extends eqLogic {
     if ($token === null) {
       log::add('estarenergy', 'debug', __('Aucun token valide trouvé. Connexion en cours...', __FILE__));
       // Équivalent à get_token($scenario, $username, $password, $token_file, $cookie_file)
-      $token = $this->.retrieveToken($login, $password, $cookieFile);
+      $token = $this->retrieveToken($login, $password, $cookieFile);
     }
 
     if ($token === null) {
