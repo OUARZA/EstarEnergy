@@ -586,27 +586,42 @@ class estarenergy extends eqLogic {
   }
 
   protected function updateEnergyCalculations(array $data, array $reflux) {
-    $todayProductionWh = $this->getNumericFromArray($data, 'today_eq');
     $importedWh = $this->getNumericFromArray($reflux, 'meter_b_in_eq');
+    $exportedWh = $this->getNumericFromArray($reflux, 'meter_b_out_eq');
     $selfConsumptionWh = $this->getNumericFromArray($reflux, 'self_eq');
 
-    if ($todayProductionWh !== null) {
-      $this->eventNumericCommand('production_kwh', $todayProductionWh / 1000.0);
+    if ($selfConsumptionWh !== null || $exportedWh !== null) {
+      $productionWh = ($selfConsumptionWh !== null ? $selfConsumptionWh : 0.0)
+        + ($exportedWh !== null ? $exportedWh : 0.0);
+      $this->eventNumericCommand('production_kwh', $productionWh / 1000.0);
     }
 
-    if ($importedWh !== null) {
-      $this->eventNumericCommand('consumption_kwh', $importedWh / 1000.0);
+    if ($selfConsumptionWh !== null || $importedWh !== null) {
+      $consumptionWh = ($selfConsumptionWh !== null ? $selfConsumptionWh : 0.0)
+        + ($importedWh !== null ? $importedWh : 0.0);
+      $this->eventNumericCommand('consumption_kwh', $consumptionWh / 1000.0);
     }
 
-    if ($selfConsumptionWh !== null) {
-      $this->eventNumericCommand('auto_production_kwh', $selfConsumptionWh / 1000.0);
+    if ($selfConsumptionWh !== null || $exportedWh !== null) {
+      $autoProductionBase = null;
+      if ($selfConsumptionWh !== null) {
+        $autoProductionBase = ($selfConsumptionWh != 0.0) ? ($selfConsumptionWh / $selfConsumptionWh) : 0.0;
+      }
+
+      $autoProductionValue = ($autoProductionBase !== null ? $autoProductionBase : 0.0)
+        + ($exportedWh !== null ? $exportedWh : 0.0);
+      $this->eventNumericCommand('auto_production_kwh', $autoProductionValue / 1000.0);
     }
 
-    if ($todayProductionWh !== null && $selfConsumptionWh !== null) {
-      $ratio = $todayProductionWh > 0 ? ($selfConsumptionWh / $todayProductionWh) * 100.0 : 0.0;
-      $this->eventNumericCommand('auto_consumption_ratio', $ratio, 2);
-    } elseif ($todayProductionWh !== null) {
-      $this->eventNumericCommand('auto_consumption_ratio', 0.0, 2);
+    if ($selfConsumptionWh !== null || $importedWh !== null) {
+      $autoConsumptionBase = null;
+      if ($selfConsumptionWh !== null) {
+        $autoConsumptionBase = ($selfConsumptionWh != 0.0) ? ($selfConsumptionWh / $selfConsumptionWh) : 0.0;
+      }
+
+      $autoConsumptionValue = ($autoConsumptionBase !== null ? $autoConsumptionBase : 0.0)
+        + ($importedWh !== null ? $importedWh : 0.0);
+      $this->eventNumericCommand('auto_consumption_ratio', $autoConsumptionValue, 2);
     }
   }
 
@@ -629,14 +644,13 @@ class estarenergy extends eqLogic {
       $this->eventNumericCommand('daily_sale_revenue', $dailyIncome, 4);
     }
 
-    $priceSpread = $salePrice - $purchasePrice;
     if ($annualProductionWh !== null) {
-      $annualRevenue = ($annualProductionWh / 1000.0) * $priceSpread;
+      $annualRevenue = ($annualProductionWh / 1000.0) * $salePrice;
       $this->eventNumericCommand('annual_revenue', $annualRevenue, 2);
     }
 
     if ($totalProductionWh !== null) {
-      $totalRevenue = ($totalProductionWh / 1000.0) * $priceSpread;
+      $totalRevenue = ($totalProductionWh / 1000.0) * $salePrice;
       $this->eventNumericCommand('total_revenue', $totalRevenue, 2);
     }
   }
