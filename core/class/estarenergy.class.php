@@ -198,7 +198,7 @@ class estarenergy extends eqLogic {
       'production_kwh' => array('name' => 'Production', 'unit' => 'kWh'),
       'consumption_kwh' => array('name' => 'Consommation', 'unit' => 'kWh'),
       'auto_production_kwh' => array('name' => 'AutoProduction', 'unit' => 'kWh'),
-      'auto_consumption_ratio' => array('name' => 'AutoConsommation', 'unit' => '%', 'isHistorized' => 0),
+      'auto_consumption_ratio' => array('name' => 'Taux d\'autoconsommation', 'unit' => '%', 'isHistorized' => 0),
       'plant_tree' => array('name' => 'Compensation carbone', 'unit' => __('arbres', __FILE__)),
       'co2_emission_reduction' => array('name' => 'Réduction des émissions de CO₂', 'unit' => 'kg'),
       'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
