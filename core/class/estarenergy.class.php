@@ -638,7 +638,7 @@ class estarenergy extends eqLogic {
         $autoProductionRate = 0.0;
       }
 
-      $this->eventNumericCommand('auto_production_rate', $autoProductionRate, 4);
+      $this->eventNumericCommand('auto_production_rate', $autoProductionRate * 100.0, 4);
     }
 
     if ($selfConsumptionEnergy !== null || $importedEnergy !== null) {
@@ -652,7 +652,7 @@ class estarenergy extends eqLogic {
         $autoConsumptionRate = 0.0;
       }
 
-      $this->eventNumericCommand('auto_consumption_rate', $autoConsumptionRate, 4);
+      $this->eventNumericCommand('auto_consumption_rate', $autoConsumptionRate * 100.0, 4);
     }
   }
 
