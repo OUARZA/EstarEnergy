@@ -221,8 +221,8 @@ class estarenergy extends eqLogic {
       'total_revenue' => array('name' => 'Revenu total', 'unit' => '€'),
       'production' => array('name' => 'Production', 'unit' => 'W'),
       'consumption' => array('name' => 'Consommation', 'unit' => 'W'),
-      'auto_production_rate' => array('name' => 'Taux Auto-Production', 'unit' => '%', 'isHistorized' => 0),
-      'auto_consumption_rate' => array('name' => 'Taux Auto-Consommation', 'unit' => '%', 'isHistorized' => 0),
+      'auto_production_rate' => array('name' => 'Taux d\'autoproduction', 'unit' => '%', 'isHistorized' => 0),
+      'auto_consumption_rate' => array('name' => 'Taux d\'autoconsommation', 'unit' => '%', 'isHistorized' => 0),
       'plant_tree' => array('name' => 'Compensation des émissions', 'unit' => __('arbres', __FILE__)),
       'co2_emission_reduction' => array('name' => 'Réduction des émissions', 'unit' => 'T'),
       'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
@@ -667,12 +667,12 @@ class estarenergy extends eqLogic {
 
     if ($importedWh !== null) {
       $dailyCost = ($importedWh / 1000.0) * $purchasePrice;
-      $this->eventNumericCommand('purchase_cost', $dailyCost, 4);
+      $this->eventNumericCommand('purchase_cost', $dailyCost, 2);
     }
 
     if ($exportedWh !== null) {
       $dailyIncome = ($exportedWh / 1000.0) * $salePrice;
-      $this->eventNumericCommand('sale_revenue', $dailyIncome, 4);
+      $this->eventNumericCommand('sale_revenue', $dailyIncome, 2);
     }
 
     if ($annualProductionWh !== null) {
