@@ -208,12 +208,12 @@ class estarenergy extends eqLogic {
       'Pv_power' => array('name' => 'Production photovoltaïque', 'unit' => 'W'),
       'Load_power' => array('name' => 'Puissance consommée', 'unit' => 'W'),
       'Grid_power' => array('name' => 'Puissance réseaux', 'unit' => 'W'),
-      'meter_b_in_eq' => array('name' => 'Énergie achat', 'unit' => 'W'),
-      'meter_b_out_eq' => array('name' => 'Énergie vente', 'unit' => 'W'),
+      'meter_b_in_eq' => array('name' => 'Énergie depuis le réseau', 'unit' => 'W'),
+      'meter_b_out_eq' => array('name' => 'Énergie vers le réseau', 'unit' => 'W'),
       'self_eq' => array('name' => 'Auto-consommation', 'unit' => 'W'),
-      'month_eq' => array('name' => 'Production mois', 'unit' => 'W'),
-      'today_eq' => array('name' => 'Production jour', 'unit' => 'kWh'),
-      'year_eq' => array('name' => 'Production année', 'unit' => 'W'),
+      'month_eq' => array('name' => 'Production du mois', 'unit' => 'W'),
+      'today_eq' => array('name' => 'Production du jour', 'unit' => 'kWh'),
+      'year_eq' => array('name' => 'Production de l\'année', 'unit' => 'W'),
       'total_eq' => array('name' => 'Production totale', 'unit' => 'W'),
       'purchase_cost' => array('name' => 'Achat', 'unit' => '€', 'isHistorized' => 0),
       'sale_revenue' => array('name' => 'Vente', 'unit' => '€', 'isHistorized' => 0),
@@ -580,8 +580,8 @@ class estarenergy extends eqLogic {
       $this->updateInfoIfPresent($reflux, 'pv_power', 'Pv_power', __('Production photovoltaïque : %s W', __FILE__));
       $this->updateInfoIfPresent($reflux, 'load_power', 'Load_power', __('Puissance consommée : %s W', __FILE__));
       $this->updateInfoIfPresent($reflux, 'grid_power', 'Grid_power', __('Puissance réseaux : %s W', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'meter_b_in_eq', 'meter_b_in_eq', __('Énergie achat : %s W', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'meter_b_out_eq', 'meter_b_out_eq', __('Énergie vente : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'meter_b_in_eq', 'meter_b_in_eq', __('Énergie depuis le réseau : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'meter_b_out_eq', 'meter_b_out_eq', __('Énergie vers le réseau : %s W', __FILE__));
       $this->updateInfoIfPresent($reflux, 'self_eq', 'self_eq', __('Auto-consommation : %s W', __FILE__));
     }
 
