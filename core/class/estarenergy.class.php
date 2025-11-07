@@ -160,6 +160,8 @@ class estarenergy extends eqLogic {
 
   // Fonction exécutée automatiquement avant la création de l'équipement
   public function preInsert() {
+    $this->setIsEnable(1);
+    $this->setIsVisible(1);
   }
 
   // Fonction exécutée automatiquement après la création de l'équipement
@@ -180,44 +182,88 @@ class estarenergy extends eqLogic {
 
   // Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
   public function postSave() {
-    $infoCommands = array(
-      'Pv_power',
-      'Load_power',
-      'Grid_power',
-      'meter_b_in_eq',
-      'meter_b_out_eq',
-      'self_eq',
-      'month_eq',
-      'today_eq',
-      'year_eq',
-      'total_eq',
-      'plant_tree',
-      'co2_emission_reduction',
+    $renamedLogicalIds = array(
+      'production_kwh' => 'production',
+      'consumption_kwh' => 'consumption',
+      'auto_production_kwh' => 'auto_production_rate',
+      'auto_consumption_ratio' => 'auto_consumption_rate',
+      'daily_sale_revenue' => 'sale_revenue',
+      'daily_purchase_cost' => 'purchase_cost',
     );
 
-    foreach ($infoCommands as $logicalId) {
-      $this->createOrUpdateInfoCommand($logicalId, $logicalId);
+    foreach ($renamedLogicalIds as $legacyId => $newId) {
+      $legacyCmd = $this->getCmd(null, $legacyId);
+      if (!is_object($legacyCmd)) {
+        continue;
+      }
+
+      $existingTarget = $this->getCmd(null, $newId);
+      if (is_object($existingTarget)) {
+        continue;
+      }
+
+      $legacyCmd->setLogicalId($newId);
+      $legacyCmd->save();
     }
 
-    $this->createOrUpdateActionCommand('refresh', __('Actualiser', __FILE__));
+    $infoCommands = array(
+      'Pv_power' => array('name' => 'Production photovoltaïque', 'unit' => 'W'),
+      'Load_power' => array('name' => 'Puissance consommée', 'unit' => 'W'),
+      'Grid_power' => array('name' => 'Puissance réseaux', 'unit' => 'W'),
+      'meter_b_in_eq' => array('name' => 'Énergie depuis le réseau', 'unit' => 'W'),
+      'meter_b_out_eq' => array('name' => 'Énergie vers le réseau', 'unit' => 'W'),
+      'self_eq' => array('name' => 'Auto-consommation', 'unit' => 'W'),
+      'month_eq' => array('name' => 'Production du mois', 'unit' => 'W'),
+      'today_eq' => array('name' => 'Production du jour', 'unit' => 'kWh'),
+      'year_eq' => array('name' => 'Production de l\'année', 'unit' => 'W'),
+      'total_eq' => array('name' => 'Production totale', 'unit' => 'W'),
+      'purchase_cost' => array('name' => 'Achat', 'unit' => '€', 'isHistorized' => 0),
+      'sale_revenue' => array('name' => 'Vente', 'unit' => '€', 'isHistorized' => 0),
+      'annual_revenue' => array('name' => 'Revenu par an', 'unit' => '€'),
+      'total_revenue' => array('name' => 'Revenu total', 'unit' => '€'),
+      'production' => array('name' => 'Production', 'unit' => 'W'),
+      'consumption' => array('name' => 'Consommation', 'unit' => 'W'),
+      'auto_production_rate' => array('name' => 'Taux autoproduction', 'unit' => '%', 'isHistorized' => 0),
+      'auto_consumption_rate' => array('name' => 'Taux autoconsommation', 'unit' => '%', 'isHistorized' => 0),
+      'plant_tree' => array('name' => 'Compensation des émissions', 'unit' => __('arbres', __FILE__)),
+      'co2_emission_reduction' => array('name' => 'Réduction des émissions', 'unit' => 'T'),
+      'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
+    );
+
+    foreach ($infoCommands as $logicalId => $properties) {
+      $subType = isset($properties['subType']) ? $properties['subType'] : 'numeric';
+      $isHistorized = array_key_exists('isHistorized', $properties) ? (int) $properties['isHistorized'] : 1;
+      $isVisible = array_key_exists('isVisible', $properties) ? (int) $properties['isVisible'] : 1;
+      $this->createOrUpdateInfoCommand(
+        $logicalId,
+        $properties['name'],
+        $properties['unit'],
+        $subType,
+        $isHistorized,
+        $isVisible
+      );
+    }
+
+    $this->createOrUpdateActionCommand('refresh', 'Actualiser');
   }
 
   /**
-   * Crée ou met à jour une commande info si elle n'existe pas encore.
+   * Crée ou met à jour une commande info avec les propriétés attendues.
    */
-  protected function createOrUpdateInfoCommand($logicalId, $name) {
+  protected function createOrUpdateInfoCommand($logicalId, $name, $unit = '', $subType = 'numeric', $isHistorized = 1, $isVisible = 1) {
     $cmd = $this->getCmd(null, $logicalId);
     if (!is_object($cmd)) {
       $cmd = new estarenergyCmd();
       $cmd->setLogicalId($logicalId);
       $cmd->setEqLogic_id($this->getId());
-      $cmd->setType('info');
-      $cmd->setSubType('numeric');
     }
 
+    $cmd->setType('info');
+    $cmd->setSubType($subType);
     $cmd->setName(__($name, __FILE__));
-    $cmd->setIsHistorized(1);
-    $cmd->setIsVisible(1);
+    $cmd->setUnite(is_string($unit) ? trim($unit) : '');
+    $cmd->setIsHistorized((int) $isHistorized);
+    $cmd->setIsVisible((int) $isVisible);
     $cmd->save();
   }
 
@@ -234,7 +280,7 @@ class estarenergy extends eqLogic {
       $cmd->setSubType('other');
     }
 
-    $cmd->setName($name);
+    $cmd->setName(__($name, __FILE__));
     $cmd->setIsVisible(1);
     $cmd->save();
   }
@@ -405,6 +451,23 @@ class estarenergy extends eqLogic {
     return $decoded;
   }
 
+  /**
+   * Encode le mot de passe comme le site Estar :
+   * md5(password) + '.' + base64(sha256(password))
+   */
+  protected function encodeEstarPassword($password) {
+    $password = (string) $password;
+
+    if ($password === '') {
+      return '';
+    }
+
+    $md5hex = md5($password);
+    $sha256_b64 = base64_encode(hash('sha256', $password, true));
+
+    return $md5hex . '.' . $sha256_b64;
+  }
+
   protected function retrieveToken($login, $password, $cookieFile, $forceRefresh = false) {
     if (!$forceRefresh) {
       $token = $this->readSavedToken();
@@ -423,12 +486,15 @@ class estarenergy extends eqLogic {
       'User-Agent: Mozilla/5.0',
     );
 
+    // Encodage du mot de passe selon le format observé côté client
+    $encodedPassword = $this->encodeEstarPassword($password);
+
     $data = json_encode(array(
       'ERROR_BACK' => true,
       'LOAD' => array('loading' => true),
       'body' => array(
         'user_name' => $login,
-        'password' => $password,
+        'password' => $encodedPassword,
       ),
       'WAITING_PROMISE' => true,
     ));
@@ -496,30 +562,49 @@ class estarenergy extends eqLogic {
   }
 
   protected function applyStationMetrics(array $data) {
-    $this->updateInfoIfPresent($data, 'today_eq', 'today_eq', __('Production du jour : %s Wh', __FILE__));
-    $this->updateInfoIfPresent($data, 'month_eq', 'month_eq', __('Production du mois : %s Wh', __FILE__));
-    $this->updateInfoIfPresent($data, 'year_eq', 'year_eq', __('Production de l’année : %s Wh', __FILE__));
-    $this->updateInfoIfPresent($data, 'total_eq', 'total_eq', __('Production totale : %s Wh', __FILE__));
-    $this->updateInfoIfPresent($data, 'co2_emission_reduction', 'co2_emission_reduction', __('Réduction CO2 : %s', __FILE__));
-    $this->updateInfoIfPresent($data, 'plant_tree', 'plant_tree', __('Compensation carbone : %s arbres', __FILE__));
+    $this->updateInfoIfPresent($data, 'today_eq', 'today_eq', __('Production du jour : %s kWh', __FILE__), function ($value) {
+      $numeric = $this->normalizeNumericValue($value);
+      if ($numeric === null) {
+        return null;
+      }
 
+      return $numeric / 1000.0;
+    });
+    $this->updateInfoIfPresent($data, 'month_eq', 'month_eq', __('Production du mois : %s W', __FILE__));
+    $this->updateInfoIfPresent($data, 'year_eq', 'year_eq', __('Production de l’année : %s W', __FILE__));
+    $this->updateInfoIfPresent($data, 'total_eq', 'total_eq', __('Production totale : %s W', __FILE__));
+    $this->updateInfoIfPresent($data, 'co2_emission_reduction', 'co2_emission_reduction', __('Réduction CO2 : %s T', __FILE__));
+    $this->updateInfoIfPresent($data, 'plant_tree', 'plant_tree', __('Compensation des émissions : %s arbres', __FILE__));
+
+    $reflux = array();
     if (isset($data['reflux_station_data']) && is_array($data['reflux_station_data'])) {
       $reflux = $data['reflux_station_data'];
-      $this->updateInfoIfPresent($reflux, 'pv_power', 'Pv_power', __('Production panneau : %s W', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'load_power', 'Load_power', __('Consommation maison : %s W', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'grid_power', 'Grid_power', __('Puisage réseau : %s W', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'meter_b_in_eq', 'meter_b_in_eq', __('Depuis le réseau : %s Wh', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'meter_b_out_eq', 'meter_b_out_eq', __('Vers le réseau : %s Wh', __FILE__));
-      $this->updateInfoIfPresent($reflux, 'self_eq', 'self_eq', __('Autoconsommation : %s Wh', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'pv_power', 'Pv_power', __('Production photovoltaïque : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'load_power', 'Load_power', __('Puissance consommée : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'grid_power', 'Grid_power', __('Puissance réseaux : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'meter_b_in_eq', 'meter_b_in_eq', __('Énergie depuis le réseau : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'meter_b_out_eq', 'meter_b_out_eq', __('Énergie vers le réseau : %s W', __FILE__));
+      $this->updateInfoIfPresent($reflux, 'self_eq', 'self_eq', __('Auto-consommation : %s W', __FILE__));
     }
+
+    $this->updateEnergyCalculations($data, $reflux);
+    $this->updateRevenueCalculations($data, $reflux);
+
+    $this->updateLastRefreshCommand();
   }
 
-  protected function updateInfoIfPresent(array $source, $sourceKey, $logicalId, $logMessage = null) {
+  protected function updateInfoIfPresent(array $source, $sourceKey, $logicalId, $logMessage = null, ?callable $transform = null) {
     if (!array_key_exists($sourceKey, $source)) {
       return;
     }
 
     $value = $source[$sourceKey];
+    if ($transform !== null) {
+      $value = $transform($value);
+      if ($value === null) {
+        return;
+      }
+    }
     $cmd = $this->getCmd(null, $logicalId);
     if (is_object($cmd)) {
       $cmd->event($value);
@@ -528,6 +613,124 @@ class estarenergy extends eqLogic {
     if ($logMessage !== null) {
       log::add('estarenergy', 'debug', sprintf($logMessage, $value));
     }
+  }
+
+  protected function updateLastRefreshCommand() {
+    $cmd = $this->getCmd(null, 'last_refresh');
+    if (!is_object($cmd)) {
+      return;
+    }
+
+    $cmd->event(date('Y-m-d H:i:s'));
+  }
+
+  protected function updateEnergyCalculations(array $data, array $reflux) {
+    $importedEnergy = $this->getNumericFromArray($reflux, 'meter_b_in_eq');
+    $exportedEnergy = $this->getNumericFromArray($reflux, 'meter_b_out_eq');
+    $selfConsumptionEnergy = $this->getNumericFromArray($reflux, 'self_eq');
+
+    if ($selfConsumptionEnergy !== null || $exportedEnergy !== null) {
+      $production = ($selfConsumptionEnergy !== null ? $selfConsumptionEnergy : 0.0)
+        + ($exportedEnergy !== null ? $exportedEnergy : 0.0);
+      $this->eventNumericCommand('production', $production);
+
+      if ($production > 0.0) {
+        $autoProductionRate = ($selfConsumptionEnergy !== null ? $selfConsumptionEnergy : 0.0) / $production;
+      } else {
+        $autoProductionRate = 0.0;
+      }
+
+      $this->eventNumericCommand('auto_production_rate', $autoProductionRate * 100.0, 1);
+    }
+
+    if ($selfConsumptionEnergy !== null || $importedEnergy !== null) {
+      $consumption = ($selfConsumptionEnergy !== null ? $selfConsumptionEnergy : 0.0)
+        + ($importedEnergy !== null ? $importedEnergy : 0.0);
+      $this->eventNumericCommand('consumption', $consumption);
+
+      if ($consumption > 0.0) {
+        $autoConsumptionRate = ($selfConsumptionEnergy !== null ? $selfConsumptionEnergy : 0.0) / $consumption;
+      } else {
+        $autoConsumptionRate = 0.0;
+      }
+
+      $this->eventNumericCommand('auto_consumption_rate', $autoConsumptionRate * 100.0, 1);
+    }
+  }
+
+  protected function updateRevenueCalculations(array $data, array $reflux) {
+    $purchasePrice = (float) config::byKey('estarpower_purchase_price_ht', 'estarenergy', 0.0);
+    $salePrice = (float) config::byKey('estarpower_sale_price_ht', 'estarenergy', 0.0);
+
+    $importedWh = $this->getNumericFromArray($reflux, 'meter_b_in_eq');
+    $exportedWh = $this->getNumericFromArray($reflux, 'meter_b_out_eq');
+    $annualProductionWh = $this->getNumericFromArray($data, 'year_eq');
+    $totalProductionWh = $this->getNumericFromArray($data, 'total_eq');
+
+    if ($importedWh !== null) {
+      $dailyCost = ($importedWh / 1000.0) * $purchasePrice;
+      $this->eventNumericCommand('purchase_cost', $dailyCost, 2);
+    }
+
+    if ($exportedWh !== null) {
+      $dailyIncome = ($exportedWh / 1000.0) * $salePrice;
+      $this->eventNumericCommand('sale_revenue', $dailyIncome, 2);
+    }
+
+    if ($annualProductionWh !== null) {
+      $annualRevenue = ($annualProductionWh / 1000.0) * $salePrice;
+      $this->eventNumericCommand('annual_revenue', $annualRevenue, 2);
+    }
+
+    if ($totalProductionWh !== null) {
+      $totalRevenue = ($totalProductionWh / 1000.0) * $salePrice;
+      $this->eventNumericCommand('total_revenue', $totalRevenue, 2);
+    }
+  }
+
+  protected function getNumericFromArray(array $source, $key) {
+    if (!array_key_exists($key, $source)) {
+      return null;
+    }
+
+    return $this->normalizeNumericValue($source[$key]);
+  }
+
+  protected function eventNumericCommand($logicalId, $value, $precision = 3) {
+    $cmd = $this->getCmd(null, $logicalId);
+    if (!is_object($cmd)) {
+      return;
+    }
+
+    if ($value === null) {
+      return;
+    }
+
+    if (is_numeric($value)) {
+      $cmd->event(round((float) $value, $precision));
+      return;
+    }
+
+    $cmd->event($value);
+  }
+
+  protected function normalizeNumericValue($value) {
+    if (is_numeric($value)) {
+      return (float) $value;
+    }
+
+    if (is_string($value)) {
+      $normalized = str_replace(',', '.', trim($value));
+      if ($normalized === '') {
+        return null;
+      }
+
+      if (is_numeric($normalized)) {
+        return (float) $normalized;
+      }
+    }
+
+    return null;
   }
 
   protected function getTokenFilePath() {
@@ -614,6 +817,7 @@ class estarenergyCmd extends cmd {
   */
 
   /*     * ***********************Methode static*************************** */
+
 
 
   /*     * *********************Methode d'instance************************* */
