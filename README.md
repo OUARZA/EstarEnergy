@@ -10,7 +10,7 @@ Le plugin **EstarEnergy** interroge le site Estar Power afin de rapatrier les do
 - Création automatique des commandes Info/Action (production, consommation, revenus, émissions évitées, etc.).
 
 ## Prérequis
-- Jeedom v4.2 ou supérieure (cf. `plugin_info/info.json`).
+- Jeedom v4.2 ou supérieure.
 - Un compte Estar Power actif et l'accès à l'interface https://monitor.estarpower.com.
 - Les identifiants (login/mot de passe) utilisés sur le portail Estar Power et l'identifiant numérique (`detail-id`) de chaque centrale à surveiller.
 
