@@ -23,3 +23,7 @@ Chaque équipement doit être rattaché à une centrale Estar. L'identifiant est
 ![URL du portail Estar mettant en avant le paramètre detail-id](images/monitor_station_id.png)
 
 Reportez la valeur mise en évidence dans le champ **ID de la centrale** de la fiche équipement du plugin.
+
+## Données journalières des modules
+
+Le plugin récupère automatiquement la réponse binaire de l'API Hoymiles `down_module_day_data`, la décode puis la stocke dans la commande info `module_day_data`. Cette commande contient un objet JSON avec la date interrogée, la liste des horodatages sur 5 minutes ainsi que les valeurs renvoyées pour chaque module (tableau `values`). Lorsque plusieurs canaux sont fournis pour un module, ils sont également exposés via `channels[field,samples]`. Vous pouvez exploiter ce JSON depuis un scénario Jeedom pour tracer des courbes personnalisées ou suivre un module spécifique.

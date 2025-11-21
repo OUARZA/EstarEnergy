@@ -21,6 +21,7 @@ require_once __DIR__  . '/../../../../core/php/core.inc.php';
 class estarenergy extends eqLogic {
   const AUTH_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
   const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
+  const MODULE_DAY_DATA_URL = 'https://neapi.hoymiles.com/pvm-data/api/0/module/data/down_module_day_data';
   const TOKEN_MAX_AGE = 3600;
   const REFRESH_CRON_OPTIONS = array(
     'cron5' => '*/5 * * * *',
@@ -227,6 +228,7 @@ class estarenergy extends eqLogic {
       'auto_consumption_rate' => array('name' => 'Taux autoconsommation', 'unit' => '%', 'isHistorized' => 0),
       'plant_tree' => array('name' => 'Compensation des émissions', 'unit' => __('arbres', __FILE__)),
       'co2_emission_reduction' => array('name' => 'Réduction des émissions', 'unit' => 'T'),
+      'module_day_data' => array('name' => 'Courbe journalière (modules)', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0, 'isVisible' => 0),
       'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
     );
 
@@ -334,6 +336,7 @@ class estarenergy extends eqLogic {
     }
 
     $this->applyStationMetrics($payload);
+    $this->refreshModuleDaySeries($login, $password, $stationId);
     log::add('estarenergy', 'info', __('Données Estar Power mises à jour', __FILE__) . ' : ' . $this->getHumanName());
   }
 
@@ -449,6 +452,75 @@ class estarenergy extends eqLogic {
     }
 
     return $decoded;
+  }
+
+  protected function fetchModuleDayData($login, $password, $stationId, $date = null) {
+    $cookieFile = $this->getCookieFilePath();
+    $token = $this->readSavedToken();
+
+    if ($token === null) {
+      log::add('estarenergy', 'debug', __('Aucun token disponible pour les données modules, reconnexion en cours...', __FILE__));
+      $token = $this->retrieveToken($login, $password, $cookieFile);
+    }
+
+    if ($token === null) {
+      throw new Exception(__('Impossible d’obtenir un token Estar Power pour les données modules', __FILE__));
+    }
+
+    $date = $date ?: date('Y-m-d');
+    $binary = $this->queryModuleDayBinary($token, $cookieFile, $stationId, $date);
+
+    if ($binary === null) {
+      $token = $this->retrieveToken($login, $password, $cookieFile, true);
+      if ($token === null) {
+        return null;
+      }
+
+      $binary = $this->queryModuleDayBinary($token, $cookieFile, $stationId, $date);
+      if ($binary === null) {
+        return null;
+      }
+    }
+
+    return $this->decodeModuleDayBinary($binary);
+  }
+
+  protected function queryModuleDayBinary($token, $cookieFile, $stationId, $date) {
+    $headers = array(
+      'Accept: application/x-protobuf,application/octet-stream',
+      'Content-Type: application/json;charset=UTF-8',
+      'User-Agent: Mozilla/5.0',
+      'Cookie: estar_token=' . $token,
+    );
+
+    $payload = json_encode(array(
+      'body' => array(
+        'sid' => (int) $stationId,
+        'date' => $date,
+      ),
+      'WAITING_PROMISE' => true,
+    ));
+
+    $response = $this->sendCurlRequest(self::MODULE_DAY_DATA_URL, $headers, $payload, $cookieFile);
+    if ($response === null || $response === '') {
+      return null;
+    }
+
+    return $response;
+  }
+
+  protected function decodeModuleDayBinary($binary) {
+    if (!is_string($binary) || $binary === '') {
+      return null;
+    }
+
+    try {
+      $decoder = new EstarenergyModuleDayDecoder();
+      return $decoder->decode($binary);
+    } catch (Exception $e) {
+      log::add('estarenergy', 'debug', sprintf(__('Impossible de décoder la réponse down_module_day_data : %s', __FILE__), $e->getMessage()));
+      return null;
+    }
   }
 
   /**
@@ -591,6 +663,32 @@ class estarenergy extends eqLogic {
     $this->updateRevenueCalculations($data, $reflux);
 
     $this->updateLastRefreshCommand();
+  }
+
+  protected function refreshModuleDaySeries($login, $password, $stationId) {
+    $cmd = $this->getCmd(null, 'module_day_data');
+    if (!is_object($cmd)) {
+      return;
+    }
+
+    try {
+      $moduleData = $this->fetchModuleDayData($login, $password, $stationId);
+    } catch (Exception $e) {
+      log::add('estarenergy', 'debug', sprintf(__('Impossible de récupérer la courbe journalière des modules : %s', __FILE__), $e->getMessage()));
+      return;
+    }
+
+    if (!is_array($moduleData) || empty($moduleData)) {
+      return;
+    }
+
+    $encoded = json_encode($moduleData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($encoded === false) {
+      log::add('estarenergy', 'debug', __('Impossible d’encoder la courbe journalière des modules au format JSON', __FILE__));
+      return;
+    }
+
+    $cmd->event($encoded);
   }
 
   protected function updateInfoIfPresent(array $source, $sourceKey, $logicalId, $logMessage = null, ?callable $transform = null) {
@@ -846,4 +944,409 @@ class estarenergyCmd extends cmd {
   }
 
   /*     * **********************Getteur Setteur*************************** */
+}
+
+class EstarenergyModuleDayDecoder {
+  public function decode($binary) {
+    $parser = new EstarenergyProtobufStream($binary);
+    $fields = $parser->parse();
+    $formatter = new EstarenergyModuleDayFormatter($fields);
+    return $formatter->format();
+  }
+}
+
+class EstarenergyProtobufStream {
+  protected $buffer;
+  protected $length;
+  protected $offset = 0;
+
+  public function __construct($buffer) {
+    $this->buffer = $buffer;
+    $this->length = strlen($buffer);
+  }
+
+  public function parse() {
+    $message = array();
+
+    while ($this->offset < $this->length) {
+      $key = $this->readVarint();
+      if ($key === null) {
+        break;
+      }
+
+      $fieldNumber = $key >> 3;
+      $wireType = $key & 0x07;
+
+      switch ($wireType) {
+        case 0:
+          $value = $this->readVarint();
+          break;
+        case 1:
+          $value = $this->readFixed64();
+          break;
+        case 2:
+          $length = $this->readVarint();
+          $value = $this->readBytes($length);
+          break;
+        case 5:
+          $value = $this->readFixed32();
+          break;
+        default:
+          throw new Exception('Unsupported protobuf wire type: ' . $wireType);
+      }
+
+      if (!isset($message[$fieldNumber])) {
+        $message[$fieldNumber] = array();
+      }
+
+      $message[$fieldNumber][] = array('wire' => $wireType, 'value' => $value);
+    }
+
+    return $message;
+  }
+
+  protected function readVarint() {
+    $result = 0;
+    $shift = 0;
+
+    while ($this->offset < $this->length) {
+      $byte = ord($this->buffer[$this->offset]);
+      $this->offset++;
+      $result |= (($byte & 0x7F) << $shift);
+
+      if (($byte & 0x80) === 0) {
+        return $result;
+      }
+
+      $shift += 7;
+      if ($shift > 63) {
+        break;
+      }
+    }
+
+    return null;
+  }
+
+  protected function readBytes($length) {
+    if ($length <= 0) {
+      return '';
+    }
+
+    $remaining = $this->length - $this->offset;
+    if ($length > $remaining) {
+      $length = $remaining;
+    }
+
+    $value = substr($this->buffer, $this->offset, $length);
+    $this->offset += $length;
+
+    return $value;
+  }
+
+  protected function readFixed32() {
+    $bytes = $this->readBytes(4);
+    if ($bytes === '') {
+      return 0;
+    }
+
+    $unpacked = unpack('V', $bytes);
+    return $unpacked[1];
+  }
+
+  protected function readFixed64() {
+    $bytes = $this->readBytes(8);
+    if ($bytes === '') {
+      return 0;
+    }
+
+    $unpacked = unpack('P', $bytes);
+    return $unpacked[1];
+  }
+}
+
+class EstarenergyModuleDayFormatter {
+  protected $fields;
+
+  public function __construct(array $fields) {
+    $this->fields = $fields;
+  }
+
+  public function format() {
+    $result = array(
+      'date' => null,
+      'timestamps' => array(),
+      'sample_count' => 0,
+      'module_count' => 0,
+      'modules' => array(),
+    );
+
+    $strings = $this->extractStringsFromField(2);
+    if (!empty($strings)) {
+      $result['date'] = array_shift($strings);
+      $result['timestamps'] = array_values(array_filter($strings, function ($value) {
+        return $value !== '';
+      }));
+    }
+
+    $result['sample_count'] = count($result['timestamps']);
+
+    $result['modules'] = $this->collectModules($result['sample_count']);
+    $result['module_count'] = count($result['modules']);
+
+    return $result;
+  }
+
+  protected function formatModule(array $fieldSet, $expectedSamples) {
+    $entry = array(
+      'index' => $this->getFirstVarint($fieldSet, 1),
+      'label' => null,
+      'serial' => null,
+      'values' => array(),
+    );
+
+    $strings = $this->collectPrintableStrings($fieldSet);
+    if (!empty($strings)) {
+      $entry['label'] = $strings[0];
+      if (isset($strings[1])) {
+        $entry['serial'] = $strings[1];
+      }
+    }
+
+    $channels = $this->buildChannels($fieldSet, $expectedSamples);
+    if (!empty($channels)) {
+      $entry['values'] = $channels[0]['samples'];
+      $entry['channels'] = $channels;
+    } else {
+      $entry['values'] = array();
+    }
+
+    if ($entry['label'] === null && $entry['index'] !== null) {
+      $entry['label'] = 'Module ' . $entry['index'];
+    }
+
+    return $entry;
+  }
+
+  protected function collectModules($expectedSamples) {
+    $modules = array();
+
+    foreach ($this->fields as $fieldNumber => $entries) {
+      if ($fieldNumber === 2) {
+        // Champ réservé aux chaînes (date et timestamps)
+        continue;
+      }
+
+      foreach ($entries as $entry) {
+        if (!is_array($entry) || $entry['wire'] !== 2) {
+          continue;
+        }
+
+        // On ignore les blocs qui ressemblent à de simples chaînes imprimables
+        if ($this->isPrintable($entry['value'])) {
+          continue;
+        }
+
+        try {
+          $subParser = new EstarenergyProtobufStream($entry['value']);
+          $moduleFields = $subParser->parse();
+        } catch (Exception $e) {
+          continue;
+        }
+
+        $module = $this->formatModule($moduleFields, $expectedSamples);
+
+        if ($this->isValidModule($module)) {
+          $module['field'] = $fieldNumber;
+          $modules[] = $module;
+        }
+      }
+    }
+
+    return $modules;
+  }
+
+  protected function isValidModule(array $module) {
+    if (!empty($module['values'])) {
+      return true;
+    }
+
+    if (!empty($module['channels'])) {
+      return true;
+    }
+
+    if ($module['index'] !== null) {
+      return true;
+    }
+
+    if (!empty($module['label']) || !empty($module['serial'])) {
+      return true;
+    }
+
+    return false;
+  }
+
+  protected function extractStringsFromField($fieldNumber) {
+    $strings = array();
+    if (!isset($this->fields[$fieldNumber])) {
+      return $strings;
+    }
+
+    foreach ($this->fields[$fieldNumber] as $entry) {
+      if (!is_array($entry) || $entry['wire'] !== 2) {
+        continue;
+      }
+
+      $strings[] = $this->normalizeString($entry['value']);
+    }
+
+    return $strings;
+  }
+
+  protected function collectPrintableStrings(array $fieldSet) {
+    $strings = array();
+
+    foreach ($fieldSet as $entries) {
+      foreach ($entries as $entry) {
+        if (!is_array($entry) || $entry['wire'] !== 2) {
+          continue;
+        }
+
+        if (!$this->isPrintable($entry['value'])) {
+          continue;
+        }
+
+        $strings[] = $this->normalizeString($entry['value']);
+      }
+    }
+
+    return $strings;
+  }
+
+  protected function buildChannels(array $fieldSet, $expectedSamples) {
+    $channels = array();
+
+    foreach ($fieldSet as $fieldNumber => $entries) {
+      foreach ($entries as $entry) {
+        if (!is_array($entry) || $entry['wire'] !== 2) {
+          continue;
+        }
+
+        if ($this->isPrintable($entry['value'])) {
+          continue;
+        }
+
+        $decoded = $this->decodeNumericBuffer($entry['value'], $expectedSamples);
+        if ($decoded === null) {
+          continue;
+        }
+
+        $channels[] = array(
+          'field' => $fieldNumber,
+          'samples' => $decoded,
+        );
+      }
+    }
+
+    return $channels;
+  }
+
+  protected function decodeNumericBuffer($buffer, $expectedSamples) {
+    $length = strlen($buffer);
+    if ($length === 0) {
+      return null;
+    }
+
+    if ($expectedSamples > 0 && $length % $expectedSamples === 0) {
+      $bytesPerSample = (int) ($length / $expectedSamples);
+      if ($bytesPerSample === 2 || $bytesPerSample === 4) {
+        return $this->unpackSamples($buffer, $bytesPerSample);
+      }
+    }
+
+    if (($length % 2) === 0) {
+      return $this->unpackSamples($buffer, 2);
+    }
+
+    if (($length % 4) === 0) {
+      return $this->unpackSamples($buffer, 4);
+    }
+
+    return null;
+  }
+
+  protected function unpackSamples($buffer, $bytesPerSample) {
+    if ($bytesPerSample === 2) {
+      $values = unpack('v*', $buffer);
+    } else {
+      $values = unpack('V*', $buffer);
+    }
+
+    if (!is_array($values)) {
+      return null;
+    }
+
+    return array_values($values);
+  }
+
+  protected function isPrintable($value) {
+    if ($value === '') {
+      return true;
+    }
+
+    if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $value)) {
+      return false;
+    }
+
+    return $this->looksUtf8($value);
+  }
+
+  protected function normalizeString($value) {
+    if ($value === '') {
+      return '';
+    }
+
+    $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value);
+    if ($cleaned === null) {
+      $cleaned = $value;
+    }
+
+    $cleaned = trim($cleaned);
+    if ($cleaned === '') {
+      return '';
+    }
+
+    if (!$this->looksUtf8($cleaned)) {
+      $cleaned = utf8_encode($cleaned);
+    }
+
+    return $cleaned;
+  }
+
+  protected function looksUtf8($value) {
+    if ($value === '') {
+      return true;
+    }
+
+    if (function_exists('mb_detect_encoding')) {
+      return mb_detect_encoding($value, 'UTF-8', true) !== false;
+    }
+
+    return @preg_match('//u', $value) === 1;
+  }
+
+  protected function getFirstVarint(array $fieldSet, $fieldNumber) {
+    if (!isset($fieldSet[$fieldNumber])) {
+      return null;
+    }
+
+    foreach ($fieldSet[$fieldNumber] as $entry) {
+      if (!is_array($entry) || $entry['wire'] !== 0) {
+        continue;
+      }
+
+      return (int) $entry['value'];
+    }
+
+    return null;
+  }
 }
