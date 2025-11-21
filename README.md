@@ -64,10 +64,13 @@ Toutes les commandes info sont historisées par défaut sauf mention contraire. 
 | `auto_consumption_rate` | Taux d'autoconsommation | Info | % | Non |
 | `plant_tree` | Compensation des émissions | Info | arbres | Oui |
 | `co2_emission_reduction` | Réduction des émissions | Info | t | Oui |
+| `module_day_data` | Courbe journalière des modules (JSON) | Info | — | Non |
 | `last_refresh` | Dernière actualisation | Info (string) | — | Non |
 | `refresh` | Actualiser | Action | — | — |
 
 > Les commandes `purchase_cost`, `sale_revenue`, `annual_revenue` et `total_revenue` sont recalculées à partir des tarifs HT déclarés dans la configuration globale. Les taux d'autoproduction/autoconsommation sont fournis en pourcentage (0–100).
+
+La commande `module_day_data` restitue un objet JSON contenant : la date interrogée, la liste des horodatages (toutes les 5 minutes) et les séries de valeurs renvoyées par l'API Hoymiles `down_module_day_data`. Chaque module possède un libellé (quand il est disponible) ainsi qu'un tableau `values` aligné avec les horodatages. Le même objet expose également `channels` lorsque plusieurs séries binaires sont retournées pour un module donné.
 
 ## Conseils d'exploitation
 - Utilisez les historiques Jeedom pour tracer l'évolution de la production, de la consommation ou de la rentabilité sur différentes périodes.
