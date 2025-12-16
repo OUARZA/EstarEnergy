@@ -1020,9 +1020,150 @@ class EstarenergyModuleDayDecoder {
     $fields = $parser->parse();
 
     $this->logFieldSummary($fields);
+    $this->logDecodedValues($fields);
 
     $formatter = new EstarenergyModuleDayFormatter($fields);
     return $formatter->format();
+  }
+
+  protected function logDecodedValues(array $fields) {
+    $entries = $this->summarizePrintableValues($fields);
+    if (empty($entries)) {
+      return;
+    }
+
+    log::add('estarenergy', 'debug', sprintf(__('Valeurs décodées down_module_day_data : %s', __FILE__), implode('; ', $entries)));
+  }
+
+  protected function summarizePrintableValues(array $fields, $path = '') {
+    $parts = array();
+
+    foreach ($fields as $fieldNumber => $entries) {
+      foreach ($entries as $entryIndex => $entry) {
+        if (!is_array($entry) || !isset($entry['wire'])) {
+          continue;
+        }
+
+        $currentPath = ($path === '') ? (string) $fieldNumber : ($path . '>' . $fieldNumber);
+
+        switch ($entry['wire']) {
+          case 0:
+          case 1:
+          case 5:
+            $parts[] = $currentPath . '=' . $entry['value'];
+            break;
+          case 2:
+            if ($this->isPrintable($entry['value'])) {
+              $parts[] = $currentPath . '="' . $this->shortenString($this->normalizeString($entry['value'])) . '"';
+              break;
+            }
+
+            $nested = $this->trySummarizePrintableNestedBuffer($entry['value'], $currentPath);
+            if (!empty($nested)) {
+              $parts = array_merge($parts, $nested);
+              break;
+            }
+
+            $parts[] = $currentPath . '[' . strlen($entry['value']) . 'B hex=' . $this->hexPreview($entry['value']) . ']';
+            break;
+          case 3:
+            if (is_array($entry['value'])) {
+              $parts = array_merge($parts, $this->summarizePrintableValues($entry['value'], $currentPath));
+            }
+            break;
+        }
+      }
+    }
+
+    return $parts;
+  }
+
+  protected function trySummarizePrintableNestedBuffer($buffer, $path) {
+    $parser = new EstarenergyProtobufStream($buffer);
+
+    try {
+      $fields = $parser->parse();
+    } catch (Exception $e) {
+      return array();
+    }
+
+    return $this->summarizePrintableValues($fields, $path);
+  }
+
+  protected function shortenString($value, $maxLength = 120) {
+    if ($value === '') {
+      return '';
+    }
+
+    if (strlen($value) <= $maxLength) {
+      return $value;
+    }
+
+    return substr($value, 0, $maxLength - 3) . '...';
+  }
+
+  protected function hexPreview($buffer, $limit = 12) {
+    $bytes = unpack('C*', substr($buffer, 0, $limit));
+    if (!is_array($bytes)) {
+      return '';
+    }
+
+    $hex = array_map(function ($byte) {
+      return strtoupper(str_pad(dechex($byte), 2, '0', STR_PAD_LEFT));
+    }, $bytes);
+
+    $preview = implode('', $hex);
+    if (strlen($buffer) > $limit) {
+      $preview .= '…';
+    }
+
+    return $preview;
+  }
+
+  protected function looksUtf8($value) {
+    if ($value === '') {
+      return true;
+    }
+
+    if (function_exists('mb_detect_encoding')) {
+      return mb_detect_encoding($value, 'UTF-8', true) !== false;
+    }
+
+    return @preg_match('//u', $value) === 1;
+  }
+
+  protected function isPrintable($value) {
+    if ($value === '') {
+      return true;
+    }
+
+    if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $value)) {
+      return false;
+    }
+
+    return $this->looksUtf8($value);
+  }
+
+  protected function normalizeString($value) {
+    if ($value === '') {
+      return '';
+    }
+
+    $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value);
+    if ($cleaned === null) {
+      $cleaned = $value;
+    }
+
+    $cleaned = trim($cleaned);
+    if ($cleaned === '') {
+      return '';
+    }
+
+    if (!$this->looksUtf8($cleaned)) {
+      $cleaned = utf8_encode($cleaned);
+    }
+
+    return $cleaned;
   }
 
   protected function logFieldSummary(array $fields) {
