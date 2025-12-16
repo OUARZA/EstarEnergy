@@ -490,6 +490,7 @@ class estarenergy extends eqLogic {
       'Accept: application/x-protobuf,application/octet-stream',
       'Content-Type: application/json;charset=UTF-8',
       'User-Agent: Mozilla/5.0',
+      'Authorization: Bearer ' . $token,
       'Cookie: estar_token=' . $token,
     );
 
@@ -514,6 +515,12 @@ class estarenergy extends eqLogic {
       return null;
     }
 
+    $trimmed = trim($binary);
+    if ($this->looksLikeJson($trimmed)) {
+      $this->logJsonModuleDayError($trimmed);
+      return null;
+    }
+
     try {
       $decoder = new EstarenergyModuleDayDecoder();
       return $decoder->decode($binary);
@@ -521,6 +528,43 @@ class estarenergy extends eqLogic {
       log::add('estarenergy', 'debug', sprintf(__('Impossible de décoder la réponse down_module_day_data : %s', __FILE__), $e->getMessage()));
       return null;
     }
+  }
+
+  protected function looksLikeJson($payload) {
+    if ($payload === '') {
+      return false;
+    }
+
+    if ($payload[0] === '{' || $payload[0] === '[') {
+      return true;
+    }
+
+    return stripos($payload, '"status"') !== false || stripos($payload, 'header authorization') !== false;
+  }
+
+  protected function logJsonModuleDayError($payload) {
+    $decoded = json_decode($payload, true);
+
+    if (is_array($decoded)) {
+      $message = isset($decoded['message']) ? $decoded['message'] : '';
+      $status = isset($decoded['status']) ? $decoded['status'] : '';
+      $data = isset($decoded['data']) ? json_encode($decoded['data']) : '';
+
+      log::add(
+        'estarenergy',
+        'debug',
+        sprintf(
+          __('Réponse JSON reçue pour down_module_day_data (status=%s, message=%s, data=%s)', __FILE__),
+          $status !== '' ? $status : 'n/a',
+          $message !== '' ? $message : 'n/a',
+          $data !== '' ? $data : 'n/a'
+        )
+      );
+      return;
+    }
+
+    $preview = substr($payload, 0, 200);
+    log::add('estarenergy', 'debug', sprintf(__('Réponse texte reçue pour down_module_day_data : %s', __FILE__), $preview));
   }
 
   /**
