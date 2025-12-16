@@ -682,6 +682,8 @@ class estarenergy extends eqLogic {
       return;
     }
 
+    $this->logModuleDayData($moduleData);
+
     $encoded = json_encode($moduleData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($encoded === false) {
       log::add('estarenergy', 'debug', __('Impossible d’encoder la courbe journalière des modules au format JSON', __FILE__));
@@ -689,6 +691,72 @@ class estarenergy extends eqLogic {
     }
 
     $cmd->event($encoded);
+  }
+
+  protected function logModuleDayData(array $moduleData) {
+    $timestamps = array();
+    if (isset($moduleData['timestamps']) && is_array($moduleData['timestamps'])) {
+      $timestamps = $moduleData['timestamps'];
+    }
+
+    $sampleCount = isset($moduleData['sample_count']) ? (int) $moduleData['sample_count'] : count($timestamps);
+    $moduleCount = isset($moduleData['module_count']) ? (int) $moduleData['module_count'] : (isset($moduleData['modules']) && is_array($moduleData['modules']) ? count($moduleData['modules']) : 0);
+
+    $timestampPreview = json_encode(array_slice($timestamps, 0, 6), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($timestampPreview === false) {
+      $timestampPreview = '[]';
+    }
+
+    log::add(
+      'estarenergy',
+      'debug',
+      sprintf(
+        __('Courbe journalière modules : date=%s, horodatages=%d (aperçu=%s), modules=%d', __FILE__),
+        isset($moduleData['date']) ? $moduleData['date'] : 'n/a',
+        $sampleCount,
+        $timestampPreview,
+        $moduleCount
+      )
+    );
+
+    if (!isset($moduleData['modules']) || !is_array($moduleData['modules'])) {
+      return;
+    }
+
+    foreach ($moduleData['modules'] as $module) {
+      $label = isset($module['label']) && $module['label'] !== null ? $module['label'] : __('Module', __FILE__);
+      if (isset($module['index']) && $module['index'] !== null) {
+        $label .= ' ' . $module['index'];
+      }
+
+      $values = array();
+      if (isset($module['values']) && is_array($module['values'])) {
+        $values = $module['values'];
+      }
+
+      $valuesPreview = json_encode(array_slice($values, 0, 5), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+      if ($valuesPreview === false) {
+        $valuesPreview = '[]';
+      }
+
+      $channelCount = isset($module['channels']) && is_array($module['channels']) ? count($module['channels']) : 0;
+      $serialInfo = isset($module['serial']) && $module['serial'] !== null ? ' (' . $module['serial'] . ')' : '';
+      $fieldInfo = isset($module['field']) ? $module['field'] : 'n/a';
+
+      log::add(
+        'estarenergy',
+        'debug',
+        sprintf(
+          __('%s%s : champ=%s, échantillons=%d, canaux=%d, aperçu valeurs=%s', __FILE__),
+          $label,
+          $serialInfo,
+          $fieldInfo,
+          count($values),
+          $channelCount,
+          $valuesPreview
+        )
+      );
+    }
   }
 
   protected function updateInfoIfPresent(array $source, $sourceKey, $logicalId, $logMessage = null, ?callable $transform = null) {
