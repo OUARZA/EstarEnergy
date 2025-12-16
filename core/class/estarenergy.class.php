@@ -1018,8 +1018,83 @@ class EstarenergyModuleDayDecoder {
   public function decode($binary) {
     $parser = new EstarenergyProtobufStream($binary);
     $fields = $parser->parse();
+
+    $this->logFieldSummary($fields);
+
     $formatter = new EstarenergyModuleDayFormatter($fields);
     return $formatter->format();
+  }
+
+  protected function logFieldSummary(array $fields) {
+    $summary = $this->summarizeFields($fields);
+    if ($summary === '') {
+      $summary = 'aucun champ décodé';
+    }
+
+    log::add('estarenergy', 'debug', sprintf(__('Structure protobuf down_module_day_data : %s', __FILE__), $summary));
+  }
+
+  protected function summarizeFields(array $fields, $depth = 0, $maxDepth = 2) {
+    $parts = array();
+    $prefix = str_repeat('>', $depth);
+
+    foreach ($fields as $fieldNumber => $entries) {
+      $wireTypes = array();
+      foreach ($entries as $entry) {
+        if (!is_array($entry) || !isset($entry['wire'])) {
+          continue;
+        }
+        $wireTypes[] = (string) $entry['wire'];
+      }
+
+      $wireTypes = array_values(array_unique($wireTypes));
+      $label = sprintf('%s%d[%s]', $prefix, $fieldNumber, implode(',', $wireTypes));
+
+      $nestedParts = array();
+      if ($depth < $maxDepth) {
+        foreach ($entries as $entry) {
+          if (!is_array($entry)) {
+            continue;
+          }
+
+          if ($entry['wire'] === 3 && is_array($entry['value'])) {
+            $nestedParts[] = $this->summarizeFields($entry['value'], $depth + 1, $maxDepth);
+          }
+
+          if ($entry['wire'] === 2 && is_string($entry['value'])) {
+            $nested = $this->trySummarizeNestedBuffer($entry['value'], $depth + 1, $maxDepth);
+            if ($nested !== '') {
+              $nestedParts[] = $nested;
+            }
+          }
+        }
+      }
+
+      if (!empty($nestedParts)) {
+        $label .= '{' . implode(';', $nestedParts) . '}';
+      }
+
+      $parts[] = $label;
+    }
+
+    return implode(', ', array_filter($parts, function ($part) {
+      return $part !== '';
+    }));
+  }
+
+  protected function trySummarizeNestedBuffer($buffer, $depth, $maxDepth) {
+    if (!is_string($buffer) || $buffer === '') {
+      return '';
+    }
+
+    $parser = new EstarenergyProtobufStream($buffer);
+    try {
+      $fields = $parser->parse();
+    } catch (Exception $e) {
+      return '';
+    }
+
+    return $this->summarizeFields($fields, $depth, $maxDepth);
   }
 }
 
@@ -1382,6 +1457,16 @@ class EstarenergyModuleDayFormatter {
   protected function buildChannels(array $fieldSet, $expectedSamples) {
     $channels = array();
 
+    $varintChannels = $this->collectVarintChannels($fieldSet);
+    foreach ($varintChannels as $fieldNumber => $samples) {
+      if ($expectedSamples === 0 || count($samples) === $expectedSamples) {
+        $channels[] = array(
+          'field' => $fieldNumber,
+          'samples' => $samples,
+        );
+      }
+    }
+
     foreach ($fieldSet as $fieldNumber => $entries) {
       foreach ($entries as $entry) {
         if (!is_array($entry) || $entry['wire'] !== 2) {
@@ -1426,6 +1511,11 @@ class EstarenergyModuleDayFormatter {
 
     if (($length % 4) === 0) {
       return $this->unpackSamples($buffer, 4);
+    }
+
+    $varints = $this->decodePackedVarints($buffer);
+    if (!empty($varints)) {
+      return $varints;
     }
 
     return null;
@@ -1514,5 +1604,56 @@ class EstarenergyModuleDayFormatter {
     } catch (Exception $e) {
       return null;
     }
+  }
+
+  protected function collectVarintChannels(array $fieldSet) {
+    $channels = array();
+
+    foreach ($fieldSet as $fieldNumber => $entries) {
+      $samples = array();
+
+      foreach ($entries as $entry) {
+        if (!is_array($entry) || $entry['wire'] !== 0) {
+          continue;
+        }
+
+        $samples[] = (int) $entry['value'];
+      }
+
+      if (!empty($samples)) {
+        $channels[$fieldNumber] = $samples;
+      }
+    }
+
+    return $channels;
+  }
+
+  protected function decodePackedVarints($buffer) {
+    $length = strlen($buffer);
+    $offset = 0;
+    $values = array();
+
+    while ($offset < $length) {
+      $result = 0;
+      $shift = 0;
+
+      while ($offset < $length) {
+        $byte = ord($buffer[$offset]);
+        $offset++;
+        $result |= (($byte & 0x7F) << $shift);
+
+        if (($byte & 0x80) === 0) {
+          $values[] = (int) $result;
+          break;
+        }
+
+        $shift += 7;
+        if ($shift > 63) {
+          break 2;
+        }
+      }
+    }
+
+    return $values;
   }
 }
