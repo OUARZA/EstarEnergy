@@ -988,6 +988,9 @@ class EstarenergyProtobufStream {
           $length = $this->readVarint();
           $value = $this->readBytes($length);
           break;
+        case 3:
+          $value = $this->readGroup($fieldNumber);
+          break;
         case 5:
           $value = $this->readFixed32();
           break;
@@ -1025,6 +1028,58 @@ class EstarenergyProtobufStream {
     }
 
     return null;
+  }
+
+  protected function readGroup($endFieldNumber) {
+    $group = array();
+
+    while ($this->offset < $this->length) {
+      $key = $this->readVarint();
+      if ($key === null) {
+        break;
+      }
+
+      $fieldNumber = $key >> 3;
+      $wireType = $key & 0x07;
+
+      if ($wireType === 4) {
+        if ($fieldNumber === $endFieldNumber) {
+          break;
+        }
+
+        // Champ de fin de groupe inattendu : on continue pour éviter les boucles infinies
+        continue;
+      }
+
+      switch ($wireType) {
+        case 0:
+          $value = $this->readVarint();
+          break;
+        case 1:
+          $value = $this->readFixed64();
+          break;
+        case 2:
+          $length = $this->readVarint();
+          $value = $this->readBytes($length);
+          break;
+        case 3:
+          $value = $this->readGroup($fieldNumber);
+          break;
+        case 5:
+          $value = $this->readFixed32();
+          break;
+        default:
+          throw new Exception('Unsupported protobuf wire type: ' . $wireType);
+      }
+
+      if (!isset($group[$fieldNumber])) {
+        $group[$fieldNumber] = array();
+      }
+
+      $group[$fieldNumber][] = array('wire' => $wireType, 'value' => $value);
+    }
+
+    return $group;
   }
 
   protected function readBytes($length) {
