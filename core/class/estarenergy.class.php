@@ -1253,39 +1253,55 @@ class EstarenergyModuleDayFormatter {
   protected function collectModules($expectedSamples) {
     $modules = array();
 
-    foreach ($this->fields as $fieldNumber => $entries) {
+    $this->collectModulesFromFields($this->fields, $expectedSamples, $modules);
+
+    return $modules;
+  }
+
+  protected function collectModulesFromFields(array $fields, $expectedSamples, array &$modules) {
+    foreach ($fields as $fieldNumber => $entries) {
       if ($fieldNumber === 2) {
-        // Champ réservé aux chaînes (date et timestamps)
         continue;
       }
 
       foreach ($entries as $entry) {
-        if (!is_array($entry) || $entry['wire'] !== 2) {
+        if (!is_array($entry)) {
           continue;
         }
 
-        // On ignore les blocs qui ressemblent à de simples chaînes imprimables
-        if ($this->isPrintable($entry['value'])) {
+        if ($entry['wire'] === 2) {
+          if ($this->isPrintable($entry['value'])) {
+            continue;
+          }
+
+          $moduleFields = $this->tryParseNestedFields($entry['value']);
+          if ($moduleFields === null) {
+            continue;
+          }
+
+          $module = $this->formatModule($moduleFields, $expectedSamples);
+
+          if ($this->isValidModule($module)) {
+            $module['field'] = $fieldNumber;
+            $modules[] = $module;
+          }
+
+          $this->collectModulesFromFields($moduleFields, $expectedSamples, $modules);
           continue;
         }
 
-        try {
-          $subParser = new EstarenergyProtobufStream($entry['value']);
-          $moduleFields = $subParser->parse();
-        } catch (Exception $e) {
-          continue;
-        }
+        if ($entry['wire'] === 3 && is_array($entry['value'])) {
+          $module = $this->formatModule($entry['value'], $expectedSamples);
 
-        $module = $this->formatModule($moduleFields, $expectedSamples);
+          if ($this->isValidModule($module)) {
+            $module['field'] = $fieldNumber;
+            $modules[] = $module;
+          }
 
-        if ($this->isValidModule($module)) {
-          $module['field'] = $fieldNumber;
-          $modules[] = $module;
+          $this->collectModulesFromFields($entry['value'], $expectedSamples, $modules);
         }
       }
     }
-
-    return $modules;
   }
 
   protected function isValidModule(array $module) {
@@ -1309,17 +1325,35 @@ class EstarenergyModuleDayFormatter {
   }
 
   protected function extractStringsFromField($fieldNumber) {
+    return $this->extractStringsFromFieldRecursive($this->fields, $fieldNumber);
+  }
+
+  protected function extractStringsFromFieldRecursive(array $fields, $fieldNumber) {
     $strings = array();
-    if (!isset($this->fields[$fieldNumber])) {
-      return $strings;
-    }
 
-    foreach ($this->fields[$fieldNumber] as $entry) {
-      if (!is_array($entry) || $entry['wire'] !== 2) {
-        continue;
+    foreach ($fields as $currentFieldNumber => $entries) {
+      foreach ($entries as $entry) {
+        if (!is_array($entry)) {
+          continue;
+        }
+
+        if ($currentFieldNumber === $fieldNumber && $entry['wire'] === 2 && $this->isPrintable($entry['value'])) {
+          $strings[] = $this->normalizeString($entry['value']);
+          continue;
+        }
+
+        if ($entry['wire'] === 3 && is_array($entry['value'])) {
+          $strings = array_merge($strings, $this->extractStringsFromFieldRecursive($entry['value'], $fieldNumber));
+          continue;
+        }
+
+        if ($entry['wire'] === 2 && !$this->isPrintable($entry['value'])) {
+          $nestedFields = $this->tryParseNestedFields($entry['value']);
+          if ($nestedFields !== null) {
+            $strings = array_merge($strings, $this->extractStringsFromFieldRecursive($nestedFields, $fieldNumber));
+          }
+        }
       }
-
-      $strings[] = $this->normalizeString($entry['value']);
     }
 
     return $strings;
@@ -1471,5 +1505,14 @@ class EstarenergyModuleDayFormatter {
     }
 
     return null;
+  }
+
+  protected function tryParseNestedFields($buffer) {
+    try {
+      $subParser = new EstarenergyProtobufStream($buffer);
+      return $subParser->parse();
+    } catch (Exception $e) {
+      return null;
+    }
   }
 }
