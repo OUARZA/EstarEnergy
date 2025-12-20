@@ -37,7 +37,7 @@
         }
     },
     "description": {
-        "fr_FR": "Template servant de base \u00e0 la cr\u00e9ation de plugins pour Jeedom"
+        "fr_FR": "Le plugin EstarEnergy interroge le site Estar Power afin de rapatrier les données de production photovoltaïque, de consommation et de bilans financiers directement dans Jeedom. Il crée automatiquement les commandes d'information nécessaires pour suivre la centrale et propose une commande d'action permettant de lancer un rafraîchissement manuel à tout moment."
     },
     "licence": "AGPL",
     "author": "Jeedom SAS",
@@ -49,10 +49,10 @@
     "category": "energy",
     "hasDependency": false,
     "hasOwnDeamon": false,
-    "changelog_beta": "https://doc.jeedom.com/#language#/plugins/programming/estarenergy/beta/changelog",
-    "changelog": "https://doc.jeedom.com/#language#/plugins/programming/estarenergy/changelog",
-    "documentation_beta": "https://doc.jeedom.com/#language#/plugins/programming/estarenergy/beta",
-    "documentation": "https://doc.jeedom.com/#language#/plugins/programming/estarenergy",
+    "changelog_beta": "https://github.com/OUARZA/EstarEnergy/blob/beta/docs/fr_FR/changelog.md",
+    "changelog": "https://github.com/OUARZA/EstarEnergy/blob/stable/docs/fr_FR/changelog.md",
+    "documentation_beta": "https://github.com/OUARZA/EstarEnergy/blob/beta/README.md",
+    "documentation": "https://github.com/OUARZA/EstarEnergy/blob/stable/README.md",
     "link": {
         "forum": "Lien vers le forum",
         "video": "Lien vers une video"

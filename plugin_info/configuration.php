@@ -50,7 +50,24 @@ if (!isConnect()) {
           <option value="cron10">{{Toutes les 10 minutes}}</option>
           <option value="cron30">{{Toutes les 30 minutes}}</option>
           <option value="cronHourly">{{Toutes les heures}}</option>
+          <option value="">{{Jamais}}</option>
         </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Prix d'achat HT (€/kWh)}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Tarif HT facturé pour chaque kWh importé depuis le réseau}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="estarpower_purchase_price_ht" type="number" step="0.0001" min="0" placeholder="{{0,0000}}"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Prix de vente HT (€/kWh)}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Tarif HT perçu pour chaque kWh injecté vers le réseau}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="estarpower_sale_price_ht" type="number" step="0.0001" min="0" placeholder="{{0,0000}}"/>
       </div>
     </div>
   </fieldset>

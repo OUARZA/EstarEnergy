@@ -25,7 +25,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
 				<span>{{Configuration}}</span>
 			</div>
 		</div>
-		<legend><i class="fas fa-table"></i> {{Mes estarenergys}}</legend>
+		<legend><i class="fas fa-table"></i> {{Mes centrales photovoltaïques}}</legend>
 		<?php
 		if (count($eqLogics) == 0) {
 			echo '<br><div class="text-center" style="font-size:1.2em;font-weight:bold;">{{Aucun équipement Template trouvé, cliquer sur "Ajouter" pour commencer}}</div>';
@@ -128,38 +128,13 @@ $eqLogics = eqLogic::byType($plugin->getId());
 
 							<legend><i class="fas fa-cogs"></i> {{Paramètres spécifiques}}</legend>
 								<div class="form-group">
-										<label class="col-sm-4 control-label">{{ID de la centrale}}
+										<label class="col-sm-4 control-label">{{L'identifiant de la centrale}}
 												<sup><i class="fas fa-question-circle tooltips" title="{{Renseignez l'identifiant de la centrale Estar récupéré sur monitor.estarpower.com}}"></i></sup>
 										</label>
 										<div class="col-sm-6">
 												<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="station_id" placeholder="{{Ex : 1234567}}">
 										</div>
 								</div>
-							<div class="form-group">
-								<label class="col-sm-4 control-label"> {{Mot de passe}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le mot de passe}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<input type="text" class="eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
-								</div>
-							</div>
-							<!-- Exemple de champ de saisie du cron d'auto-actualisation avec assistant -->
-							<!-- La fonction cron de la classe du plugin doit contenir le code prévu pour que ce champ soit fonctionnel -->
-							<div class="form-group">
-								<label class="col-sm-4 control-label">{{Auto-actualisation}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Fréquence de rafraîchissement des commandes infos de l'équipement}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<div class="input-group">
-										<input type="text" class="eqLogicAttr form-control roundedLeft" data-l1key="configuration" data-l2key="autorefresh" placeholder="{{Cliquer sur ? pour afficher l'assistant cron}}">
-										<span class="input-group-btn">
-											<a class="btn btn-default cursor jeeHelper roundedRight" data-helper="cron" title="Assistant cron">
-												<i class="fas fa-question-circle"></i>
-											</a>
-										</span>
-									</div>
-								</div>
-							</div>
 						</div>
 
 						<!-- Partie droite de l'onglet "Équipement" -->
@@ -176,7 +151,7 @@ $eqLogics = eqLogic::byType($plugin->getId());
                                                                 <div class="col-sm-12">
                                                                         <div class="alert alert-info" role="alert">
                                                                                 <strong>{{Où trouver l'identifiant de la centrale ?}}</strong>
-                                                                                <p>{{Connectez-vous à monitor.estarpower.com puis ouvrez votre centrale. L'identifiant attendu dans le champ ci-contre correspond à la valeur affichée après `detail-id` dans l'URL du navigateur.}}</p>
+                                                                                <p>{{Connectez-vous à <a href="https://monitor.estarpower.com">monitor.estarpower.com</a> puis ouvrez votre centrale. L'identifiant attendu dans le champ ci-contre correspond à la valeur affichée après `detail-id` dans l'URL du navigateur.}}</p>
                                                                                 <img src="plugins/estarenergy/desktop/img/monitor_station_id.png" class="img-responsive center-block img-thumbnail" alt="{{Extrait d'URL monitor.estarpower.com mettant en évidence le paramètre detail-id}}">
                                                                         </div>
                                                                 </div>
