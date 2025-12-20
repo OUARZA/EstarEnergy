@@ -737,6 +737,11 @@ class estarenergy extends eqLogic {
       return array($segment, $offset);
     }
 
+    $packedFloats = $this->decodePackedFloatArray($segment);
+    if ($packedFloats !== null) {
+      return array($packedFloats, $offset);
+    }
+
     if ($depth < 8) {
       $nested = $this->decodeProtobufMessage($segment, $depth + 1);
       if (count($nested) > 0) {
@@ -745,6 +750,25 @@ class estarenergy extends eqLogic {
     }
 
     return array(base64_encode($segment), $offset);
+  }
+
+  protected function decodePackedFloatArray($segment) {
+    $length = strlen($segment);
+    if ($length === 0 || ($length % 4) !== 0) {
+      return null;
+    }
+
+    $floats = array();
+    $chunks = str_split($segment, 4);
+    foreach ($chunks as $chunk) {
+      $unpacked = unpack('g', $chunk);
+      if (!is_array($unpacked)) {
+        return null;
+      }
+      $floats[] = $unpacked[1];
+    }
+
+    return $floats;
   }
 
   protected function decodeFixed32($payload, $offset) {
