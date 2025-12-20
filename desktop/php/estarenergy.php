@@ -127,14 +127,22 @@ $eqLogics = eqLogic::byType($plugin->getId());
 							</div>
 
 							<legend><i class="fas fa-cogs"></i> {{Paramètres spécifiques}}</legend>
-								<div class="form-group">
-										<label class="col-sm-4 control-label">{{L'identifiant de la centrale}}
-												<sup><i class="fas fa-question-circle tooltips" title="{{Renseignez l'identifiant de la centrale Estar récupéré sur monitor.estarpower.com}}"></i></sup>
-										</label>
-										<div class="col-sm-6">
-												<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="station_id" placeholder="{{Ex : 1234567}}">
-										</div>
-								</div>
+                                <div class="form-group">
+                                        <label class="col-sm-4 control-label">{{L'identifiant de la centrale}}
+                                                <sup><i class="fas fa-question-circle tooltips" title="{{Renseignez l'identifiant de la centrale Estar récupéré sur monitor.estarpower.com}}"></i></sup>
+                                        </label>
+                                        <div class="col-sm-6">
+                                                <input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="station_id" placeholder="{{Ex : 1234567}}">
+                                        </div>
+                                </div>
+                                <div class="form-group">
+                                        <label class="col-sm-4 control-label">{{Numéro de série du module}}
+                                                <sup><i class="fas fa-question-circle tooltips" title="{{Référez-vous à l'onglet modules de monitor.estarpower.com ou à l'étiquette du micro-onduleur.}}"></i></sup>
+                                        </label>
+                                        <div class="col-sm-6">
+                                                <input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="module_sn" placeholder="{{Ex : HMxxxxxxxx}}">
+                                        </div>
+                                </div>
 						</div>
 
 						<!-- Partie droite de l'onglet "Équipement" -->

@@ -21,6 +21,7 @@ require_once __DIR__  . '/../../../../core/php/core.inc.php';
 class estarenergy extends eqLogic {
   const AUTH_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
   const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
+  const MODULE_DAY_DATA_URL = 'https://neapi.hoymiles.com/pvm-data/api/0/module/data/down_module_day_data';
   const TOKEN_MAX_AGE = 3600;
   const REFRESH_CRON_OPTIONS = array(
     'cron5' => '*/5 * * * *',
@@ -228,6 +229,7 @@ class estarenergy extends eqLogic {
       'plant_tree' => array('name' => 'Compensation des émissions', 'unit' => __('arbres', __FILE__)),
       'co2_emission_reduction' => array('name' => 'Réduction des émissions', 'unit' => 'T'),
       'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
+      'module_day_data' => array('name' => 'Données journalières des modules', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
     );
 
     foreach ($infoCommands as $logicalId => $properties) {
@@ -322,6 +324,7 @@ class estarenergy extends eqLogic {
 
     try {
       $payload = $this->fetchStationData($login, $password, $stationId);
+      $token = $this->readSavedToken();
     } catch (Exception $e) {
       log::add('estarenergy', 'error', $e->getMessage());
       message::add('estarenergy', $e->getMessage());
@@ -334,6 +337,7 @@ class estarenergy extends eqLogic {
     }
 
     $this->applyStationMetrics($payload);
+    $this->refreshModuleDayMetrics($token);
     log::add('estarenergy', 'info', __('Données Estar Power mises à jour', __FILE__) . ' : ' . $this->getHumanName());
   }
 
@@ -523,7 +527,7 @@ class estarenergy extends eqLogic {
     return $token;
   }
 
-  protected function sendCurlRequest($url, array $headers, $payload, $cookieFile, $storeCookies = false) {
+  protected function sendCurlRequest($url, array $headers, $payload, $cookieFile = null, $storeCookies = false) {
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -532,11 +536,15 @@ class estarenergy extends eqLogic {
     curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
     curl_setopt($curl, CURLOPT_TIMEOUT, 30);
 
-    if ($storeCookies) {
-      curl_setopt($curl, CURLOPT_COOKIEJAR, $cookieFile);
-    } else {
-      curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
+    if ($cookieFile !== null) {
+      if ($storeCookies) {
+        curl_setopt($curl, CURLOPT_COOKIEJAR, $cookieFile);
+      } else {
+        curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
+      }
     }
+
+    curl_setopt($curl, CURLOPT_ENCODING, '');
 
     log::add('estarenergy', 'debug', sprintf(__('Appel HTTP vers %s', __FILE__), $url));
 
@@ -559,6 +567,349 @@ class estarenergy extends eqLogic {
     log::add('estarenergy', 'debug', sprintf(__('Réponse HTTP 200 reçue depuis %s', __FILE__), $url));
 
     return $response;
+  }
+
+  protected function refreshModuleDayMetrics($token) {
+    $moduleSerial = trim((string) $this->getConfiguration('module_sn'));
+    if ($moduleSerial === '') {
+      return;
+    }
+
+    if ($token === null || $token === '') {
+      log::add('estarenergy', 'debug', __('Impossible de récupérer les données modules : token indisponible', __FILE__));
+      return;
+    }
+
+    $date = date('Y-m-d');
+    try {
+      $rawPayload = $this->requestModuleDayData($token, $moduleSerial, $date);
+    } catch (Exception $e) {
+      log::add('estarenergy', 'error', $e->getMessage());
+      return;
+    }
+
+    if ($rawPayload === null || $rawPayload === '') {
+      log::add('estarenergy', 'warning', __('Aucune donnée module reçue', __FILE__));
+      return;
+    }
+
+    $decoded = $this->decodeModuleDayPayload($rawPayload);
+    if ($decoded === null) {
+      log::add('estarenergy', 'warning', __('Données modules inexploitables', __FILE__));
+      return;
+    }
+
+    $json = json_encode($decoded);
+    if ($json === false) {
+      log::add('estarenergy', 'warning', __('Impossible de sérialiser les données modules', __FILE__));
+      return;
+    }
+
+    $cmd = $this->getCmd(null, 'module_day_data');
+    if (is_object($cmd)) {
+      $cmd->event($json);
+    }
+  }
+
+  protected function requestModuleDayData($token, $moduleSerial, $date) {
+    $headers = array(
+      'Accept: application/json, text/plain, */*',
+      'Accept-Encoding: gzip, deflate, br, zstd',
+      'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7,vi;q=0.6',
+      'Cache-Control: no-cache',
+      'Connection: keep-alive',
+      'Content-Type: application/json',
+      'Origin: https://monitor.estarpower.com',
+      'Pragma: no-cache',
+      'Referer: https://monitor.estarpower.com/',
+      'User-Agent: Mozilla/5.0',
+      'authorization: ' . $token,
+      'language: fr-fr',
+    );
+
+    $payload = json_encode(array(
+      'date' => $date,
+      'sn' => $moduleSerial,
+    ));
+
+    $response = $this->sendCurlRequest(self::MODULE_DAY_DATA_URL, $headers, $payload, null);
+    if ($response === null) {
+      throw new Exception(__('Erreur lors de la récupération des données modules', __FILE__));
+    }
+
+    return $response;
+  }
+
+  protected function decodeModuleDayPayload($rawPayload) {
+    if ($rawPayload === '' || $rawPayload === null) {
+      return null;
+    }
+
+    $maybeUnpacked = $this->tryGzipDecode($rawPayload);
+    if ($maybeUnpacked !== null) {
+      $rawPayload = $maybeUnpacked;
+    }
+
+    $json = json_decode($rawPayload, true);
+    if (is_array($json)) {
+      return $json;
+    }
+
+    $decodedProto = $this->decodeProtobufBuffer($rawPayload);
+    if (!is_array($decodedProto)) {
+      return null;
+    }
+
+    return $this->normalizeModuleDayDecoded($decodedProto);
+  }
+
+  protected function tryGzipDecode($payload) {
+    if ($payload === '' || $payload === null) {
+      return null;
+    }
+
+    $decoded = @gzdecode($payload);
+    if ($decoded !== false && $decoded !== null && $decoded !== '') {
+      return $decoded;
+    }
+
+    return null;
+  }
+
+  protected function decodeProtobufBuffer($buffer, $depth = 0) {
+    if (!is_string($buffer)) {
+      return null;
+    }
+
+    $length = strlen($buffer);
+    if ($length === 0 || $depth > 5) {
+      return null;
+    }
+
+    $result = array();
+    $offset = 0;
+
+    while ($offset < $length) {
+      $keyData = $this->readVarintFromBuffer($buffer, $offset);
+      if ($keyData === null) {
+        break;
+      }
+
+      list($key, $offset) = $keyData;
+      $fieldNumber = $key >> 3;
+      $wireType = $key & 0x07;
+      $value = null;
+
+      switch ($wireType) {
+        case 0: // Varint
+          $varint = $this->readVarintFromBuffer($buffer, $offset);
+          if ($varint !== null) {
+            list($value, $offset) = $varint;
+          }
+          break;
+        case 1: // 64-bit
+          if ($offset + 8 <= $length) {
+            $raw = substr($buffer, $offset, 8);
+            $unpacked = unpack('P', $raw);
+            $value = is_array($unpacked) ? $unpacked[1] : bin2hex(strrev($raw));
+            $offset += 8;
+          }
+          break;
+        case 2: // Length-delimited
+          $lenData = $this->readVarintFromBuffer($buffer, $offset);
+          if ($lenData === null) {
+            break 2;
+          }
+          list($len, $offset) = $lenData;
+          if ($len < 0 || $offset + $len > $length) {
+            break 2;
+          }
+          $slice = substr($buffer, $offset, $len);
+          $offset += $len;
+
+          if ($slice === '') {
+            $value = '';
+            break;
+          }
+
+          if ($this->looksLikeUtf8($slice)) {
+            $value = $slice;
+            break;
+          }
+
+          $nested = $this->decodeProtobufBuffer($slice, $depth + 1);
+          $value = is_array($nested) && !empty($nested) ? $nested : base64_encode($slice);
+          break;
+        case 5: // 32-bit
+          if ($offset + 4 <= $length) {
+            $raw32 = substr($buffer, $offset, 4);
+            $unpacked32 = unpack('V', $raw32);
+            $value = is_array($unpacked32) ? $unpacked32[1] : bin2hex(strrev($raw32));
+            $offset += 4;
+          }
+          break;
+        default:
+          $offset = $length;
+          break;
+      }
+
+      if ($value === null) {
+        continue;
+      }
+
+      if (array_key_exists($fieldNumber, $result)) {
+        if (!is_array($result[$fieldNumber]) || $this->isAssociative($result[$fieldNumber])) {
+          $result[$fieldNumber] = array($result[$fieldNumber]);
+        }
+        $result[$fieldNumber][] = $value;
+      } else {
+        $result[$fieldNumber] = $value;
+      }
+    }
+
+    return $result;
+  }
+
+  protected function normalizeModuleDayDecoded(array $decoded) {
+    $date = $this->findDateString($decoded);
+    $timeSlots = $this->findTimeSlots($decoded);
+
+    $series = array();
+    if (!empty($timeSlots)) {
+      $this->collectNumericSeries($decoded, $series, $timeSlots, '');
+    }
+
+    return array(
+      'date' => $date,
+      'time_slots' => $timeSlots,
+      'series' => $series,
+      'protobuf' => $decoded,
+    );
+  }
+
+  protected function findDateString($node) {
+    if (is_string($node) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $node)) {
+      return $node;
+    }
+
+    if (!is_array($node)) {
+      return null;
+    }
+
+    foreach ($node as $value) {
+      $candidate = $this->findDateString($value);
+      if ($candidate !== null) {
+        return $candidate;
+      }
+    }
+
+    return null;
+  }
+
+  protected function findTimeSlots($node) {
+    if (is_array($node) && !$this->isAssociative($node) && $this->isTimeSeriesArray($node)) {
+      return array_values($node);
+    }
+
+    if (!is_array($node)) {
+      return array();
+    }
+
+    foreach ($node as $value) {
+      $candidate = $this->findTimeSlots($value);
+      if (!empty($candidate)) {
+        return $candidate;
+      }
+    }
+
+    return array();
+  }
+
+  protected function collectNumericSeries($node, array &$series, array $timeSlots, $path) {
+    if (!is_array($node)) {
+      return;
+    }
+
+    if (!$this->isAssociative($node) && $this->arrayIsNumeric($node) && count($node) === count($timeSlots)) {
+      $series[] = array(
+        'path' => $path,
+        'values' => array_values($node),
+      );
+    }
+
+    foreach ($node as $key => $value) {
+      $nextPath = ($path === '') ? (string) $key : $path . '.' . $key;
+      $this->collectNumericSeries($value, $series, $timeSlots, $nextPath);
+    }
+  }
+
+  protected function isTimeSeriesArray(array $values) {
+    if (empty($values)) {
+      return false;
+    }
+
+    foreach ($values as $value) {
+      if (!is_string($value) || !preg_match('/^\d{2}:\d{2}$/', $value)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  protected function arrayIsNumeric(array $values) {
+    foreach ($values as $value) {
+      if (!is_numeric($value)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  protected function looksLikeUtf8($value) {
+    if (!is_string($value)) {
+      return false;
+    }
+
+    if ($value === '') {
+      return true;
+    }
+
+    return function_exists('mb_detect_encoding')
+      ? mb_detect_encoding($value, 'UTF-8', true) !== false
+      : (bool) preg_match('//u', $value);
+  }
+
+  protected function isAssociative($array) {
+    if (!is_array($array)) {
+      return false;
+    }
+
+    return array_keys($array) !== range(0, count($array) - 1);
+  }
+
+  protected function readVarintFromBuffer($buffer, $offset) {
+    $result = 0;
+    $shift = 0;
+    $length = strlen($buffer);
+
+    while ($offset < $length) {
+      $byte = ord($buffer[$offset]);
+      $offset++;
+
+      $result |= (($byte & 0x7F) << $shift);
+      if (($byte & 0x80) === 0) {
+        return array($result, $offset);
+      }
+
+      $shift += 7;
+      if ($shift > 64) {
+        break;
+      }
+    }
+
+    return null;
   }
 
   protected function applyStationMetrics(array $data) {
