@@ -538,6 +538,7 @@ class estarenergy extends eqLogic {
 
     $decoded = $this->decodeProtobufMessage($payload);
     $summary = $this->summarizeModuleDayData($decoded);
+    $summary = $this->applyModuleAliases($summary);
 
     return array(
       'date' => $summary['date'],
@@ -769,6 +770,101 @@ class estarenergy extends eqLogic {
     }
 
     return $floats;
+  }
+
+  /**
+   * Applique les alias configurés par l'utilisateur sur les séries module (chemins protobuf)
+   * pour produire un JSON plus lisible (timeline + series_overview).
+   */
+  protected function applyModuleAliases(array $moduleData) {
+    $aliases = $this->parseModuleSeriesAliases((string) $this->getConfiguration('module_series_alias', ''));
+    if (count($aliases) === 0) {
+      return $moduleData;
+    }
+
+    // Ajout des alias dans series_overview
+    if (isset($moduleData['series_overview']) && is_array($moduleData['series_overview'])) {
+      foreach ($moduleData['series_overview'] as &$serie) {
+        if (!isset($serie['path'])) {
+          continue;
+        }
+        if (isset($aliases[$serie['path']])) {
+          $serie['label'] = $aliases[$serie['path']];
+        }
+      }
+      unset($serie);
+    }
+
+    // Renommage des clés dans le timeline
+    if (isset($moduleData['timeline']) && is_array($moduleData['timeline'])) {
+      $newTimeline = array();
+      foreach ($moduleData['timeline'] as $entry) {
+        if (!is_array($entry)) {
+          continue;
+        }
+        $newEntry = array();
+        foreach ($entry as $key => $value) {
+          if ($key === 'time') {
+            $newEntry[$key] = $value;
+            continue;
+          }
+          $alias = array_key_exists($key, $aliases) ? $aliases[$key] : $key;
+          $newEntry[$alias] = $value;
+        }
+        $newTimeline[] = $newEntry;
+      }
+      $moduleData['timeline'] = $newTimeline;
+    }
+
+    $moduleData['applied_aliases'] = $aliases;
+
+    return $moduleData;
+  }
+
+  /**
+   * Parse les alias fournis par l'utilisateur.
+   * Formats acceptés :
+   * - JSON objet : {"3.0.2.5":"Panneau 1"}
+   * - Lignes clé=alias, une par ligne
+   */
+  protected function parseModuleSeriesAliases($raw) {
+    $raw = trim((string) $raw);
+    if ($raw === '') {
+      return array();
+    }
+
+    // Essai JSON
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) {
+      $mapping = array();
+      foreach ($decoded as $key => $value) {
+        $key = trim((string) $key);
+        $value = trim((string) $value);
+        if ($key !== '' && $value !== '') {
+          $mapping[$key] = $value;
+        }
+      }
+      if (count($mapping) > 0) {
+        return $mapping;
+      }
+    }
+
+    // Fallback lignes clé=alias
+    $mapping = array();
+    $lines = preg_split('/\\r?\\n/', $raw);
+    foreach ($lines as $line) {
+      if (strpos($line, '=') === false) {
+        continue;
+      }
+      list($key, $value) = explode('=', $line, 2);
+      $key = trim($key);
+      $value = trim($value);
+      if ($key !== '' && $value !== '') {
+        $mapping[$key] = $value;
+      }
+    }
+
+    return $mapping;
   }
 
   protected function decodeFixed32($payload, $offset) {
