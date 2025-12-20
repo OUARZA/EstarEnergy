@@ -121,6 +121,10 @@ class estarenergy extends eqLogic {
 
   // Fonction exécutée automatiquement après la sauvegarde (création ou mise à jour) de l'équipement
   public function postSave() {
+    $this->createOrUpdateInfoCmd('raw_data', __('Dernière réponse brute', __FILE__));
+    $this->createOrUpdateInfoCmd('times', __('Créneaux horaires détectés', __FILE__));
+    $this->createOrUpdateInfoCmd('queried_date', __('Date interrogée', __FILE__));
+    $this->createOrUpdateActionCmd('refresh', __('Rafraîchir les données', __FILE__));
   }
 
   // Fonction exécutée automatiquement avant la suppression de l'équipement
@@ -129,6 +133,220 @@ class estarenergy extends eqLogic {
 
   // Fonction exécutée automatiquement après la suppression de l'équipement
   public function postRemove() {
+  }
+
+  /**
+   * Appelle l'endpoint Hoymiles pour récupérer les données journalières d'un module.
+   *
+   * @param array $options
+   * @return array
+   * @throws Exception
+   */
+  public static function fetchModuleDayData($options = array()) {
+    $moduleId = isset($options['moduleId']) ? $options['moduleId'] : (isset($options['module_id']) ? $options['module_id'] : null);
+    $moduleSn = isset($options['moduleSn']) ? $options['moduleSn'] : (isset($options['module_sn']) ? $options['module_sn'] : null);
+    $date = isset($options['date']) ? $options['date'] : date('Y-m-d');
+
+    if ($moduleId === null || $moduleId === '') {
+      throw new Exception(__('Identifiant de module manquant pour l’appel Hoymiles', __FILE__));
+    }
+
+    $baseUrl = trim(config::byKey('api_base_url', 'estarenergy', 'https://neapi.hoymiles.com'));
+    $endpointPath = trim(config::byKey('endpoint_path', 'estarenergy', '/pvm-data/api/0/module/data/down_module_day_data'));
+    $authorization = trim(config::byKey('authorization_token', 'estarenergy'));
+    $language = trim(config::byKey('api_language', 'estarenergy', 'fr-fr'));
+    $payloadTemplate = config::byKey('payload_template', 'estarenergy', '{"moduleId":{{moduleId}},"date":"{{date}}"}');
+
+    if ($baseUrl === '') {
+      throw new Exception(__('URL de l’API Hoymiles non configurée', __FILE__));
+    }
+    if ($authorization === '') {
+      throw new Exception(__('Jeton d’autorisation non configuré', __FILE__));
+    }
+
+    $url = rtrim($baseUrl, '/') . $endpointPath;
+    $payload = self::buildPayload($payloadTemplate, array(
+      'moduleId' => $moduleId,
+      'moduleSn' => $moduleSn,
+      'date' => $date,
+    ));
+
+    $headers = array(
+      'Accept: application/octet-stream',
+      'Content-Type: application/json',
+      'authorization: ' . $authorization,
+      'language: ' . $language,
+    );
+
+    $curl = curl_init($url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_POST, true);
+    curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($curl, CURLOPT_ENCODING, '');
+    curl_setopt($curl, CURLOPT_TIMEOUT, 20);
+
+    $response = curl_exec($curl);
+    $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $contentType = curl_getinfo($curl, CURLINFO_CONTENT_TYPE);
+    $curlError = curl_error($curl);
+    curl_close($curl);
+
+    if ($response === false) {
+      throw new Exception(__('Erreur cURL : ', __FILE__) . $curlError);
+    }
+
+    log::add('estarenergy', 'debug', sprintf('Appel Hoymiles %s | payload=%s | http=%s', $url, $payload, $httpCode));
+
+    $decodedData = self::decodeModuleDayStream($response);
+
+    return array(
+      'url' => $url,
+      'http_code' => $httpCode,
+      'content_type' => $contentType,
+      'payload' => $payload,
+      'decoded' => $decodedData,
+      'raw_base64' => base64_encode($response),
+    );
+  }
+
+  /**
+   * Remplace les placeholders du modèle par les valeurs réelles.
+   *
+   * @param string $template
+   * @param array $variables
+   * @return string
+   */
+  private static function buildPayload($template, $variables) {
+    $payload = $template;
+    foreach ($variables as $key => $value) {
+      $payload = str_replace('{{' . $key . '}}', $value, $payload);
+      $payload = str_replace('{{ ' . $key . ' }}', $value, $payload);
+    }
+    return $payload;
+  }
+
+  /**
+   * Décode le flux binaire renvoyé par l'API.
+   *
+   * @param string $stream
+   * @return array
+   */
+  private static function decodeModuleDayStream($stream) {
+    $maybeDecoded = self::maybeGzipDecode($stream);
+    $jsonData = json_decode($maybeDecoded, true);
+    if (json_last_error() === JSON_ERROR_NONE) {
+      return array(
+        'format' => 'json',
+        'data' => $jsonData,
+      );
+    }
+
+    $date = self::extractDate($maybeDecoded);
+    $times = self::extractTimes($maybeDecoded);
+
+    return array(
+      'format' => 'binary',
+      'date' => $date,
+      'times' => $times,
+      'printable_excerpt' => self::extractPrintableExcerpt($maybeDecoded),
+    );
+  }
+
+  private static function extractDate($data) {
+    if (preg_match('/\\d{4}-\\d{2}-\\d{2}/', $data, $matches)) {
+      return $matches[0];
+    }
+    return null;
+  }
+
+  private static function extractTimes($data) {
+    if (preg_match_all('/\\b\\d{2}:\\d{2}\\b/', $data, $matches)) {
+      return $matches[0];
+    }
+    return array();
+  }
+
+  private static function extractPrintableExcerpt($data) {
+    $printable = preg_replace('/[^\\x20-\\x7E]/', ' ', $data);
+    $printable = preg_replace('/\\s+/', ' ', $printable);
+    return trim(substr($printable, 0, 1024));
+  }
+
+  private static function maybeGzipDecode($data) {
+    if (substr($data, 0, 2) === "\x1f\x8b") {
+      $decoded = @gzdecode($data);
+      if ($decoded !== false) {
+        return $decoded;
+      }
+    }
+    return $data;
+  }
+
+  /**
+   * Rafraîchit les données pour l'équipement courant et met à jour les commandes infos.
+   *
+   * @throws Exception
+   */
+  public function refreshData() {
+    $options = array(
+      'moduleId' => $this->getConfiguration('module_id'),
+      'moduleSn' => $this->getConfiguration('module_sn'),
+      'date' => $this->getConfiguration('query_date'),
+    );
+    if ($options['date'] == '') {
+      $options['date'] = date('Y-m-d');
+    }
+
+    $result = self::fetchModuleDayData($options);
+
+    $decoded = isset($result['decoded']) ? $result['decoded'] : array();
+    $date = isset($decoded['date']) && $decoded['date'] !== null ? $decoded['date'] : $options['date'];
+    $times = isset($decoded['times']) ? implode(', ', $decoded['times']) : '';
+
+    $this->updateInfoCmd('raw_data', json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    $this->updateInfoCmd('queried_date', $date);
+    $this->updateInfoCmd('times', $times);
+  }
+
+  private function createOrUpdateInfoCmd($logicalId, $name) {
+    $cmd = $this->getCmd('info', $logicalId);
+    if (!is_object($cmd)) {
+      $cmd = new estarenergyCmd();
+      $cmd->setLogicalId($logicalId);
+      $cmd->setEqLogic_id($this->getId());
+      $cmd->setName($name);
+      $cmd->setType('info');
+      $cmd->setSubType('string');
+      $cmd->setIsHistorized(1);
+      $cmd->save();
+    } else {
+      $cmd->setName($name);
+      $cmd->save();
+    }
+  }
+
+  private function createOrUpdateActionCmd($logicalId, $name) {
+    $cmd = $this->getCmd('action', $logicalId);
+    if (!is_object($cmd)) {
+      $cmd = new estarenergyCmd();
+      $cmd->setLogicalId($logicalId);
+      $cmd->setEqLogic_id($this->getId());
+      $cmd->setName($name);
+      $cmd->setType('action');
+      $cmd->setSubType('other');
+      $cmd->save();
+    } else {
+      $cmd->setName($name);
+      $cmd->save();
+    }
+  }
+
+  private function updateInfoCmd($logicalId, $value) {
+    $cmd = $this->getCmd('info', $logicalId);
+    if (is_object($cmd)) {
+      $cmd->event($value);
+    }
   }
 
   /*
@@ -171,6 +389,14 @@ class estarenergyCmd extends cmd {
 
   // Exécution d'une commande
   public function execute($_options = array()) {
+    if ($this->getLogicalId() == 'refresh') {
+      $eqLogic = $this->getEqLogic();
+      if (!is_object($eqLogic)) {
+        throw new Exception(__('Equipement introuvable pour exécuter la commande', __FILE__));
+      }
+      $eqLogic->refreshData();
+      return;
+    }
   }
 
   /*     * **********************Getteur Setteur*************************** */

@@ -29,9 +29,27 @@ try {
   */
     ajax::init();
 
+    $action = init('action');
 
+    if ($action == 'fetchModuleDayData') {
+        $eqLogicId = init('eqLogic_id');
+        $eqLogic = null;
+        if ($eqLogicId != '') {
+            $eqLogic = estarenergy::byId($eqLogicId);
+        }
+        $date = init('date', $eqLogic ? $eqLogic->getConfiguration('query_date') : '');
+        if ($date == '') {
+            $date = date('Y-m-d');
+        }
+        $options = array(
+            'moduleId' => init('module_id', $eqLogic ? $eqLogic->getConfiguration('module_id') : null),
+            'moduleSn' => init('module_sn', $eqLogic ? $eqLogic->getConfiguration('module_sn') : null),
+            'date' => $date,
+        );
+        ajax::success(estarenergy::fetchModuleDayData($options));
+    }
 
-    throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
+    throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . $action);
     /*     * *********Catch exeption*************** */
 }
 catch (Exception $e) {

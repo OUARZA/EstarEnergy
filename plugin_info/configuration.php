@@ -25,31 +25,44 @@ if (!isConnect()) {
 <form class="form-horizontal">
   <fieldset>
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Global param 1}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le paramètre 1 du plugin}}"></i></sup>
+      <label class="col-md-4 control-label">{{URL de l'API Hoymiles}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Adresse de base pour les appels (ex : https://neapi.hoymiles.com)}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="param1"/>
+        <input class="configKey form-control" data-l1key="api_base_url" placeholder="https://neapi.hoymiles.com" />
       </div>
     </div>
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Global param 2}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Renseignez le paramètre 2 du plugin}}"></i></sup>
+      <label class="col-md-4 control-label">{{Jeton d'autorisation}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Valeur de l'en-tête authorization retournée par monitor.estarpower.com}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <input class="configKey form-control" data-l1key="param2"/>
+        <input class="configKey form-control inputPassword" data-l1key="authorization_token" />
       </div>
     </div>
     <div class="form-group">
-      <label class="col-md-4 control-label">{{Global param 3}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Sélectionnez du paramètre 3 du plugin}}"></i></sup>
+      <label class="col-md-4 control-label">{{Langue des requêtes}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Valeur envoyée dans l'en-tête language (ex : fr-fr)}}"></i></sup>
       </label>
       <div class="col-md-4">
-        <select class="configKey form-control" data-l1key="param3">
-          <option value=""></option>
-          <option value="value1">value1</option>
-          <option value="value2">value2</option>
-        </select>
+        <input class="configKey form-control" data-l1key="api_language" placeholder="fr-fr" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Chemin de l'endpoint}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Chemin relatif utilisé pour récupérer les données journalières du module}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="endpoint_path" placeholder="/pvm-data/api/0/module/data/down_module_day_data" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Modèle de payload par défaut}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{JSON envoyé dans le POST. Utilisez les variables {{moduleId}}, {{moduleSn}} et {{date}}}}"></i></sup>
+      </label>
+      <div class="col-md-6">
+        <textarea class="configKey form-control" rows="3" data-l1key="payload_template">{"moduleId":{{moduleId}},"date":"{{date}}"}</textarea>
+        <span class="help-block">{{Les marqueurs seront remplacés avant l'envoi. Laissez les guillemets dans le modèle.}}</span>
       </div>
     </div>
   </fieldset>
