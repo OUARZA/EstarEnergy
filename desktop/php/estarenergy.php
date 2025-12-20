@@ -135,6 +135,16 @@ $eqLogics = eqLogic::byType($plugin->getId());
 												<input type="text" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="station_id" placeholder="{{Ex : 1234567}}">
 										</div>
 								</div>
+								<div class="form-group">
+										<label class="col-sm-4 control-label">{{Courbe modules (5 min Hoymiles)}}
+												<sup><i class="fas fa-question-circle tooltips" title="{{Active le téléchargement et le décodage de la requête down_module_day_data de neapi.hoymiles.com pour récupérer les points 5 minutes des modules. Les données JSON sont stockées dans la commande info 'Courbe modules (JSON)'.}}"></i></sup>
+										</label>
+										<div class="col-sm-6">
+												<label class="checkbox-inline">
+														<input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="enable_module_day_data" value="1">{{Activer}}
+												</label>
+										</div>
+								</div>
 						</div>
 
 						<!-- Partie droite de l'onglet "Équipement" -->
