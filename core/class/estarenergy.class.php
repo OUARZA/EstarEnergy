@@ -21,6 +21,7 @@ require_once __DIR__  . '/../../../../core/php/core.inc.php';
 class estarenergy extends eqLogic {
   const AUTH_URL = 'https://monitor.estarpower.com/platform/api/gateway/iam/auth_login';
   const DATA_URL = 'https://monitor.estarpower.com/platform/api/gateway/pvm-data/data_count_station_real_data';
+  const MODULE_DAY_DATA_URL = 'https://neapi.hoymiles.com/pvm-data/api/0/module/data/down_module_day_data';
   const TOKEN_MAX_AGE = 3600;
   const REFRESH_CRON_OPTIONS = array(
     'cron5' => '*/5 * * * *',
@@ -228,6 +229,7 @@ class estarenergy extends eqLogic {
       'plant_tree' => array('name' => 'Compensation des émissions', 'unit' => __('arbres', __FILE__)),
       'co2_emission_reduction' => array('name' => 'Réduction des émissions', 'unit' => 'T'),
       'last_refresh' => array('name' => 'Dernière actualisation', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0),
+      'module_day_data' => array('name' => 'Courbe modules (JSON)', 'unit' => '', 'subType' => 'string', 'isHistorized' => 0, 'isVisible' => 0),
     );
 
     foreach ($infoCommands as $logicalId => $properties) {
@@ -334,6 +336,7 @@ class estarenergy extends eqLogic {
     }
 
     $this->applyStationMetrics($payload);
+    $this->refreshModuleDayData($login, $password, $stationId);
     log::add('estarenergy', 'info', __('Données Estar Power mises à jour', __FILE__) . ' : ' . $this->getHumanName());
   }
 
@@ -452,6 +455,505 @@ class estarenergy extends eqLogic {
   }
 
   /**
+   * Récupère et décode les données journalières détaillées (point 5 minutes) exposées
+   * par l'API Hoymiles. Le décodage du corps binaire se fait via un parseur protobuf
+   * générique afin de rester compatible avec les évolutions du schéma.
+   */
+  protected function refreshModuleDayData($login, $password, $stationId) {
+    if ((int) $this->getConfiguration('enable_module_day_data', 0) !== 1) {
+      return;
+    }
+
+    $command = $this->getCmd(null, 'module_day_data');
+    if (!is_object($command)) {
+      return;
+    }
+
+    try {
+      $moduleData = $this->fetchModuleDayData($login, $password, $stationId);
+    } catch (Exception $e) {
+      log::add('estarenergy', 'error', sprintf(__('Données journalières module indisponibles : %s', __FILE__), $e->getMessage()));
+      return;
+    }
+
+    if (!is_array($moduleData) || count($moduleData) === 0) {
+      log::add('estarenergy', 'debug', __('Aucune donnée journalière module décodée', __FILE__));
+      return;
+    }
+
+    $json = json_encode($moduleData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+      log::add('estarenergy', 'error', __('Impossible de sérialiser les données journalières module', __FILE__));
+      return;
+    }
+
+    $command->event($json);
+    log::add('estarenergy', 'debug', sprintf(__('Données journalières module synchronisées (%d entrées)', __FILE__), isset($moduleData['timeline']) ? count($moduleData['timeline']) : 0));
+  }
+
+  protected function fetchModuleDayData($login, $password, $stationId) {
+    $cookieFile = $this->getCookieFilePath();
+    if (!file_exists($cookieFile)) {
+      touch($cookieFile);
+    }
+
+    $token = $this->readSavedToken();
+    if ($token === null) {
+      $token = $this->retrieveToken($login, $password, $cookieFile, true);
+    }
+
+    if ($token === null) {
+      throw new Exception(__('Impossible de récupérer le token Estar Power pour les données module', __FILE__));
+    }
+
+    $headers = array(
+      'Accept: application/json, text/plain, */*',
+      'Accept-Encoding: gzip, deflate, br, zstd',
+      'Content-Type: application/json',
+      'User-Agent: Mozilla/5.0',
+      'Authorization: ' . $token,
+      'Origin: https://monitor.estarpower.com',
+      'Referer: https://monitor.estarpower.com/',
+      'language: fr-fr',
+    );
+
+    $payload = json_encode(array(
+      'sid' => (int) $stationId,
+      'date' => date('Y-m-d'),
+    ));
+
+    $response = $this->sendCurlRequest(self::MODULE_DAY_DATA_URL, $headers, $payload, $cookieFile, false, true);
+    if ($response === null) {
+      return null;
+    }
+
+    return $this->decodeModuleDayResponse($response);
+  }
+
+  protected function decodeModuleDayResponse($response) {
+    $payload = @gzdecode($response);
+    if ($payload === false || $payload === '') {
+      $payload = $response;
+    }
+
+    $decoded = $this->decodeProtobufMessage($payload);
+    $summary = $this->summarizeModuleDayData($decoded);
+    if ((int) $this->getConfiguration('store_module_raw_payload', 0) === 1) {
+      $summary['payload_base64'] = base64_encode($payload);
+    }
+    $summary = $this->applyModuleAliases($summary);
+
+    return array(
+      'date' => $summary['date'],
+      'time_slots' => $summary['time_slots'],
+      'series_overview' => $summary['series_overview'],
+      'timeline' => $summary['timeline'],
+      'payload_bytes' => strlen($payload),
+    );
+  }
+
+  protected function summarizeModuleDayData(array $decoded) {
+    $timeSlots = $this->collectStringsMatching($decoded, '/^\d{2}:\d{2}$/');
+    $timeSlots = array_values(array_unique($timeSlots));
+    $date = $this->findFirstStringMatching($decoded, '/^\d{4}-\d{2}-\d{2}$/');
+
+    $slotCount = count($timeSlots);
+    if ($slotCount === 0) {
+      return array(
+        'date' => $date,
+        'time_slots' => $timeSlots,
+        'series_overview' => array(),
+        'timeline' => array(),
+      );
+    }
+
+    $series = $this->collectNumericSeries($decoded);
+    $series = array_values(array_filter($series, function ($serie) {
+      return isset($serie['values']) && is_array($serie['values']) && count($serie['values']) > 0;
+    }));
+
+    foreach ($series as &$serie) {
+      if (!isset($serie['values']) || !is_array($serie['values'])) {
+        continue;
+      }
+      if (count($serie['values']) > $slotCount) {
+        $serie['values'] = array_slice($serie['values'], 0, $slotCount);
+      }
+      $serie['missing'] = 0;
+    }
+    unset($serie);
+
+    $timeline = $this->buildModuleTimeline($timeSlots, $series);
+    $seriesOverview = array_map(function ($serie) {
+      $values = $serie['values'];
+      return array(
+        'path' => $serie['path'],
+        'count' => count($values),
+        'min' => min($values),
+        'max' => max($values),
+        'missing' => isset($serie['missing']) ? $serie['missing'] : 0,
+      );
+    }, $series);
+
+    return array(
+      'date' => $date,
+      'time_slots' => $timeSlots,
+      'series_overview' => $seriesOverview,
+      'timeline' => $timeline,
+    );
+  }
+
+  protected function buildModuleTimeline(array $timeSlots, array &$series) {
+    $timeline = array();
+    $slotCount = count($timeSlots);
+
+    for ($i = 0; $i < $slotCount; $i++) {
+      $entry = array('time' => $timeSlots[$i]);
+      foreach ($series as $index => $serie) {
+        $value = array_key_exists($i, $serie['values']) ? $serie['values'][$i] : null;
+        if ($value === null && !isset($series[$index]['missing'])) {
+          $series[$index]['missing'] = 0;
+        }
+        if ($value === null) {
+          $series[$index]['missing'] = isset($series[$index]['missing']) ? $series[$index]['missing'] + 1 : 1;
+        }
+        $entry[$serie['path']] = $value;
+      }
+      $timeline[] = $entry;
+    }
+
+    return $timeline;
+  }
+
+  protected function collectNumericSeries($data, $path = '') {
+    $series = array();
+
+    if (is_array($data)) {
+      $isList = array_keys($data) === range(0, count($data) - 1);
+      if ($isList && $this->arrayIsNumeric($data)) {
+        $series[] = array(
+          'path' => $path === '' ? 'values' : $path,
+          'values' => array_map('floatval', $data),
+        );
+        return $series;
+      }
+
+      foreach ($data as $key => $value) {
+        $childPath = $path === '' ? (string) $key : $path . '.' . $key;
+        $series = array_merge($series, $this->collectNumericSeries($value, $childPath));
+      }
+    }
+
+    return $series;
+  }
+
+  protected function arrayIsNumeric($data) {
+    if (!is_array($data)) {
+      return false;
+    }
+
+    foreach ($data as $value) {
+      if (!is_numeric($value)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  protected function collectStringsMatching($data, $pattern, &$result = array()) {
+    if (is_string($data) && preg_match($pattern, $data)) {
+      $result[] = $data;
+      return $result;
+    }
+
+    if (is_array($data)) {
+      foreach ($data as $value) {
+        $this->collectStringsMatching($value, $pattern, $result);
+      }
+    }
+
+    return $result;
+  }
+
+  protected function findFirstStringMatching($data, $pattern) {
+    $matches = $this->collectStringsMatching($data, $pattern);
+    if (count($matches) === 0) {
+      return '';
+    }
+
+    return $matches[0];
+  }
+
+  protected function decodeProtobufMessage($payload, $depth = 0) {
+    $length = strlen($payload);
+    $offset = 0;
+    $result = array();
+
+    while ($offset < $length) {
+      list($key, $offset) = $this->decodeVarint($payload, $offset);
+      $fieldNumber = $key >> 3;
+      $wireType = $key & 0x07;
+
+      switch ($wireType) {
+        case 0:
+          list($value, $offset) = $this->decodeVarint($payload, $offset);
+          break;
+        case 1:
+          $value = $this->decodeFixed64($payload, $offset);
+          $offset += 8;
+          break;
+        case 2:
+          list($value, $offset) = $this->decodeLengthDelimited($payload, $offset, $depth);
+          break;
+        case 5:
+          $value = $this->decodeFixed32($payload, $offset);
+          $offset += 4;
+          break;
+        default:
+          $value = null;
+          $offset = $length;
+          break;
+      }
+
+      if (!array_key_exists($fieldNumber, $result)) {
+        $result[$fieldNumber] = $value;
+      } else {
+        if (!is_array($result[$fieldNumber]) || array_keys($result[$fieldNumber]) !== range(0, count($result[$fieldNumber]) - 1)) {
+          $result[$fieldNumber] = array($result[$fieldNumber]);
+        }
+        $result[$fieldNumber][] = $value;
+      }
+    }
+
+    return $result;
+  }
+
+  protected function decodeVarint($payload, $offset) {
+    $result = 0;
+    $shift = 0;
+    $length = strlen($payload);
+
+    while ($offset < $length) {
+      $byte = ord($payload[$offset]);
+      $offset++;
+      $result |= (($byte & 0x7f) << $shift);
+      if (($byte & 0x80) === 0) {
+        break;
+      }
+      $shift += 7;
+    }
+
+    return array($result, $offset);
+  }
+
+  protected function decodeLengthDelimited($payload, $offset, $depth) {
+    list($length, $newOffset) = $this->decodeVarint($payload, $offset);
+    $segment = substr($payload, $newOffset, $length);
+    $offset = $newOffset + $length;
+
+    if ($segment === false) {
+      return array('', $offset);
+    }
+
+    if ($this->isPrintableUtf8($segment)) {
+      return array($segment, $offset);
+    }
+
+    $packedFloats = $this->decodePackedFloatArray($segment);
+    if ($packedFloats !== null) {
+      return array($packedFloats, $offset);
+    }
+
+    if ($depth < 8) {
+      $nested = $this->decodeProtobufMessage($segment, $depth + 1);
+      if (count($nested) > 0) {
+        return array($nested, $offset);
+      }
+    }
+
+    return array(base64_encode($segment), $offset);
+  }
+
+  protected function decodePackedFloatArray($segment) {
+    $length = strlen($segment);
+    if ($length === 0 || ($length % 4) !== 0) {
+      return null;
+    }
+
+    $floats = array();
+    $chunks = str_split($segment, 4);
+    foreach ($chunks as $chunk) {
+      $unpacked = unpack('g', $chunk);
+      if (!is_array($unpacked)) {
+        return null;
+      }
+      $floats[] = $unpacked[1];
+    }
+
+    return $floats;
+  }
+
+  protected function decodePackedFixed32Array($segment) {
+    $length = strlen($segment);
+    if ($length === 0 || ($length % 4) !== 0) {
+      return null;
+    }
+
+    $ints = array();
+    $chunks = str_split($segment, 4);
+    foreach ($chunks as $chunk) {
+      $unpacked = unpack('V', $chunk);
+      if (!is_array($unpacked)) {
+        return null;
+      }
+      $ints[] = (int) $unpacked[1];
+    }
+
+    return $ints;
+  }
+
+  /**
+   * Applique les alias configurés par l'utilisateur sur les séries module (chemins protobuf)
+   * pour produire un JSON plus lisible (timeline + series_overview).
+   */
+  protected function applyModuleAliases(array $moduleData) {
+    $aliases = $this->parseModuleSeriesAliases((string) $this->getConfiguration('module_series_alias', ''));
+    if (count($aliases) === 0) {
+      return $moduleData;
+    }
+
+    // Ajout des alias dans series_overview
+    if (isset($moduleData['series_overview']) && is_array($moduleData['series_overview'])) {
+      foreach ($moduleData['series_overview'] as &$serie) {
+        if (!isset($serie['path'])) {
+          continue;
+        }
+        if (isset($aliases[$serie['path']])) {
+          $serie['label'] = $aliases[$serie['path']];
+        }
+      }
+      unset($serie);
+    }
+
+    // Renommage des clés dans le timeline
+    if (isset($moduleData['timeline']) && is_array($moduleData['timeline'])) {
+      $newTimeline = array();
+      foreach ($moduleData['timeline'] as $entry) {
+        if (!is_array($entry)) {
+          continue;
+        }
+        $newEntry = array();
+        foreach ($entry as $key => $value) {
+          if ($key === 'time') {
+            $newEntry[$key] = $value;
+            continue;
+          }
+          $alias = array_key_exists($key, $aliases) ? $aliases[$key] : $key;
+          $newEntry[$alias] = $value;
+        }
+        $newTimeline[] = $newEntry;
+      }
+      $moduleData['timeline'] = $newTimeline;
+    }
+
+    $moduleData['applied_aliases'] = $aliases;
+
+    return $moduleData;
+  }
+
+  /**
+   * Parse les alias fournis par l'utilisateur.
+   * Formats acceptés :
+   * - JSON objet : {"3.0.2.5":"Panneau 1"}
+   * - Lignes clé=alias, une par ligne
+   */
+  protected function parseModuleSeriesAliases($raw) {
+    $raw = trim((string) $raw);
+    if ($raw === '') {
+      return array();
+    }
+
+    // Essai JSON
+    $decoded = json_decode($raw, true);
+    if (is_array($decoded)) {
+      $mapping = array();
+      foreach ($decoded as $key => $value) {
+        $key = trim((string) $key);
+        $value = trim((string) $value);
+        if ($key !== '' && $value !== '') {
+          $mapping[$key] = $value;
+        }
+      }
+      if (count($mapping) > 0) {
+        return $mapping;
+      }
+    }
+
+    // Fallback lignes clé=alias
+    $mapping = array();
+    $lines = preg_split('/\\r?\\n/', $raw);
+    foreach ($lines as $line) {
+      if (strpos($line, '=') === false) {
+        continue;
+      }
+      list($key, $value) = explode('=', $line, 2);
+      $key = trim($key);
+      $value = trim($value);
+      if ($key !== '' && $value !== '') {
+        $mapping[$key] = $value;
+      }
+    }
+
+    return $mapping;
+  }
+
+  protected function decodeFixed32($payload, $offset) {
+    $slice = substr($payload, $offset, 4);
+    if ($slice === false || strlen($slice) < 4) {
+      return null;
+    }
+
+    $unpacked = unpack('V', $slice);
+    if (!is_array($unpacked)) {
+      return null;
+    }
+
+    return $unpacked[1];
+  }
+
+  protected function decodeFixed64($payload, $offset) {
+    $slice = substr($payload, $offset, 8);
+    if ($slice === false || strlen($slice) < 8) {
+      return null;
+    }
+
+    $parts = unpack('V2', $slice);
+    if (!is_array($parts)) {
+      return null;
+    }
+
+    return $parts[1] + ($parts[2] << 32);
+  }
+
+  protected function isPrintableUtf8($value) {
+    if (!is_string($value)) {
+      return false;
+    }
+
+    if (!function_exists('mb_detect_encoding')) {
+      return false;
+    }
+
+    if (mb_detect_encoding($value, 'UTF-8', true) === false) {
+      return false;
+    }
+
+    $printable = preg_replace('/[[:print:][:space:]]/u', '', $value);
+    return $printable === '';
+  }
+
+  /**
    * Encode le mot de passe comme le site Estar :
    * md5(password) + '.' + base64(sha256(password))
    */
@@ -523,7 +1025,7 @@ class estarenergy extends eqLogic {
     return $token;
   }
 
-  protected function sendCurlRequest($url, array $headers, $payload, $cookieFile, $storeCookies = false) {
+  protected function sendCurlRequest($url, array $headers, $payload, $cookieFile, $storeCookies = false, $acceptCompressed = false) {
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -531,6 +1033,9 @@ class estarenergy extends eqLogic {
     curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($curl, CURLOPT_POSTFIELDS, $payload);
     curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+    if ($acceptCompressed) {
+      curl_setopt($curl, CURLOPT_ENCODING, '');
+    }
 
     if ($storeCookies) {
       curl_setopt($curl, CURLOPT_COOKIEJAR, $cookieFile);
