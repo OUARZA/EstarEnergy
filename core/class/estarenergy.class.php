@@ -538,6 +538,9 @@ class estarenergy extends eqLogic {
 
     $decoded = $this->decodeProtobufMessage($payload);
     $summary = $this->summarizeModuleDayData($decoded);
+    if ((int) $this->getConfiguration('store_module_raw_payload', 0) === 1) {
+      $summary['payload_base64'] = base64_encode($payload);
+    }
     $summary = $this->applyModuleAliases($summary);
 
     return array(

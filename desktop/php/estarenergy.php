@@ -146,6 +146,16 @@ $eqLogics = eqLogic::byType($plugin->getId());
 										</div>
 								</div>
 								<div class="form-group">
+										<label class="col-sm-4 control-label">{{Payload brut (debug)}}
+												<sup><i class="fas fa-question-circle tooltips" title="{{Si coché, le payload binaire de l'API Hoymiles est encodé en Base64 et ajouté au JSON (champ 'payload_base64'). Utile pour le support/diagnostic.}}"></i></sup>
+										</label>
+										<div class="col-sm-6">
+												<label class="checkbox-inline">
+														<input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="store_module_raw_payload" value="1">{{Inclure le binaire encodé}}
+												</label>
+										</div>
+								</div>
+								<div class="form-group">
 										<label class="col-sm-4 control-label">{{Alias des séries modules}}
 												<sup><i class="fas fa-question-circle tooltips" title="{{Facultatif : saisissez les alias des séries du flux Hoymiles (ex : 3.0.2.5=Panneau 1). Un alias par ligne ou un objet JSON {\"3.0.2.5\":\"Panneau 1\"}. Les alias seront utilisés dans le JSON de la commande 'Courbe modules (JSON)'.}}"></i></sup>
 										</label>
