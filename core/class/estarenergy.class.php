@@ -558,14 +558,8 @@ class estarenergy extends eqLogic {
     $date = $this->findFirstStringMatching($decoded, '/^\d{4}-\d{2}-\d{2}$/');
 
     $series = $this->collectNumericSeries($decoded);
-    $series = array_values(array_filter($series, function ($serie) use ($timeSlots) {
-      if (!isset($serie['values']) || !is_array($serie['values'])) {
-        return false;
-      }
-      if (count($timeSlots) === 0) {
-        return false;
-      }
-      return count($serie['values']) === count($timeSlots);
+    $series = array_values(array_filter($series, function ($serie) {
+      return isset($serie['values']) && is_array($serie['values']) && count($serie['values']) > 0;
     }));
 
     $timeline = $this->buildModuleTimeline($timeSlots, $series);
@@ -576,6 +570,7 @@ class estarenergy extends eqLogic {
         'count' => count($values),
         'min' => min($values),
         'max' => max($values),
+        'missing' => isset($serie['missing']) ? $serie['missing'] : 0,
       );
     }, $series);
 
@@ -588,17 +583,20 @@ class estarenergy extends eqLogic {
   }
 
   protected function buildModuleTimeline(array $timeSlots, array $series) {
-    if (count($timeSlots) === 0 || count($series) === 0) {
-      return array();
-    }
-
     $timeline = array();
-    $count = count($timeSlots);
+    $slotCount = count($timeSlots);
 
-    for ($i = 0; $i < $count; $i++) {
+    for ($i = 0; $i < $slotCount; $i++) {
       $entry = array('time' => $timeSlots[$i]);
-      foreach ($series as $serie) {
-        $entry[$serie['path']] = $serie['values'][$i];
+      foreach ($series as $index => $serie) {
+        $value = array_key_exists($i, $serie['values']) ? $serie['values'][$i] : null;
+        if ($value === null && !isset($series[$index]['missing'])) {
+          $series[$index]['missing'] = 0;
+        }
+        if ($value === null) {
+          $series[$index]['missing'] = isset($series[$index]['missing']) ? $series[$index]['missing'] + 1 : 1;
+        }
+        $entry[$serie['path']] = $value;
       }
       $timeline[] = $entry;
     }
@@ -746,6 +744,16 @@ class estarenergy extends eqLogic {
       return array($packedFloats, $offset);
     }
 
+    $packedFixed32 = $this->decodePackedFixed32Array($segment);
+    if ($packedFixed32 !== null) {
+      return array($packedFixed32, $offset);
+    }
+
+    $packedVarints = $this->decodePackedVarintArray($segment);
+    if ($packedVarints !== null) {
+      return array($packedVarints, $offset);
+    }
+
     if ($depth < 8) {
       $nested = $this->decodeProtobufMessage($segment, $depth + 1);
       if (count($nested) > 0) {
@@ -773,6 +781,41 @@ class estarenergy extends eqLogic {
     }
 
     return $floats;
+  }
+
+  protected function decodePackedFixed32Array($segment) {
+    $length = strlen($segment);
+    if ($length === 0 || ($length % 4) !== 0) {
+      return null;
+    }
+
+    $ints = array();
+    $chunks = str_split($segment, 4);
+    foreach ($chunks as $chunk) {
+      $unpacked = unpack('V', $chunk);
+      if (!is_array($unpacked)) {
+        return null;
+      }
+      $ints[] = (int) $unpacked[1];
+    }
+
+    return $ints;
+  }
+
+  protected function decodePackedVarintArray($segment) {
+    $length = strlen($segment);
+    if ($length === 0) {
+      return null;
+    }
+
+    $offset = 0;
+    $values = array();
+    while ($offset < $length) {
+      list($value, $offset) = $this->decodeVarint($segment, $offset);
+      $values[] = (int) $value;
+    }
+
+    return $values;
   }
 
   /**
