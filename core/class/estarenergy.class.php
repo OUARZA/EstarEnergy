@@ -557,10 +557,31 @@ class estarenergy extends eqLogic {
     $timeSlots = array_values(array_unique($timeSlots));
     $date = $this->findFirstStringMatching($decoded, '/^\d{4}-\d{2}-\d{2}$/');
 
+    $slotCount = count($timeSlots);
+    if ($slotCount === 0) {
+      return array(
+        'date' => $date,
+        'time_slots' => $timeSlots,
+        'series_overview' => array(),
+        'timeline' => array(),
+      );
+    }
+
     $series = $this->collectNumericSeries($decoded);
     $series = array_values(array_filter($series, function ($serie) {
       return isset($serie['values']) && is_array($serie['values']) && count($serie['values']) > 0;
     }));
+
+    foreach ($series as &$serie) {
+      if (!isset($serie['values']) || !is_array($serie['values'])) {
+        continue;
+      }
+      if (count($serie['values']) > $slotCount) {
+        $serie['values'] = array_slice($serie['values'], 0, $slotCount);
+      }
+      $serie['missing'] = 0;
+    }
+    unset($serie);
 
     $timeline = $this->buildModuleTimeline($timeSlots, $series);
     $seriesOverview = array_map(function ($serie) {
@@ -582,7 +603,7 @@ class estarenergy extends eqLogic {
     );
   }
 
-  protected function buildModuleTimeline(array $timeSlots, array $series) {
+  protected function buildModuleTimeline(array $timeSlots, array &$series) {
     $timeline = array();
     $slotCount = count($timeSlots);
 
@@ -744,16 +765,6 @@ class estarenergy extends eqLogic {
       return array($packedFloats, $offset);
     }
 
-    $packedFixed32 = $this->decodePackedFixed32Array($segment);
-    if ($packedFixed32 !== null) {
-      return array($packedFixed32, $offset);
-    }
-
-    $packedVarints = $this->decodePackedVarintArray($segment);
-    if ($packedVarints !== null) {
-      return array($packedVarints, $offset);
-    }
-
     if ($depth < 8) {
       $nested = $this->decodeProtobufMessage($segment, $depth + 1);
       if (count($nested) > 0) {
@@ -800,22 +811,6 @@ class estarenergy extends eqLogic {
     }
 
     return $ints;
-  }
-
-  protected function decodePackedVarintArray($segment) {
-    $length = strlen($segment);
-    if ($length === 0) {
-      return null;
-    }
-
-    $offset = 0;
-    $values = array();
-    while ($offset < $length) {
-      list($value, $offset) = $this->decodeVarint($segment, $offset);
-      $values[] = (int) $value;
-    }
-
-    return $values;
   }
 
   /**
